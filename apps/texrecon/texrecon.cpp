@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
             << "Temporary directory \"tmp\" exists within the destination directory.\n"
             << "Cannot continue since this directory would be delete in the end.\n"
             << std::endl;
-        std::exit(EXIT_FAILURE);
+        //std::exit(EXIT_FAILURE);
     }
 
     std::cout << "Load and prepare mesh: " << std::endl;
