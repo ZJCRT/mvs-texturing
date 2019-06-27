@@ -37,6 +37,9 @@ typedef SparseTable<std::uint32_t, std::uint16_t, float> DataCosts;
 typedef std::vector<std::vector<VertexProjectionInfo> > VertexProjectionInfos;
 typedef std::vector<std::vector<FaceProjectionInfo> > FaceProjectionInfos;
 
+using Segment = std::vector<unsigned int>;
+using Segmentation = std::vector<Segment>;
+
 /**
   * prepares the mesh for texturing
   *  -removes duplicated faces
@@ -77,7 +80,7 @@ postprocess_face_infos(Settings const & settings,
  * Runs the view selection procedure and saves the labeling in the graph
  */
 void
-view_selection(DataCosts const & data_costs, UniGraph * graph, Settings const & settings);
+view_selection(DataCosts const & data_costs, Segmentation const & segmentation, UniGraph * graph, Settings const & settings);
 
 /**
   * Generates texture patches using the graph to determine adjacent faces with the same label.

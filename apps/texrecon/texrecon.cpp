@@ -24,6 +24,33 @@
 
 #include "arguments.h"
 
+void create_sample_segmentation(mve::TriangleMesh::Ptr const mesh, tex::Segmentation * segments)
+{
+    const auto & facelist = mesh->get_faces();
+    const auto & vertexlist = mesh->get_vertices();
+
+    using Zuord = std::pair<unsigned int, float>;
+    std::vector<Zuord> data;
+    for (int i = 0; i < facelist.size(); i += 3)
+    {
+        Zuord z{i / 3, vertexlist[facelist[i]][2]};
+        data.push_back(z);
+    }
+    std::sort(data.begin(), data.end(), [](Zuord & z1, Zuord & z2) { return z1.second < z2.second;});
+    unsigned int segment_size = facelist.size() / 16;
+    for (int seg_num = 0; seg_num< 4; ++seg_num)
+    {
+        segments->push_back(tex::Segment());
+        auto & segment = segments->back();
+        for (int i = 0; i < segment_size; ++i)
+        {
+            segment.push_back(data[seg_num * segment_size + i].first);
+        }
+    }
+
+}
+
+
 int main(int argc, char **argv) {
     util::system::print_build_timestamp(argv[0]);
     util::system::register_segfault_handler();
@@ -77,6 +104,9 @@ int main(int argc, char **argv) {
 
     std::size_t const num_faces = mesh->get_faces().size() / 3;
 
+    tex::Segmentation segments;
+    create_sample_segmentation( mesh, &segments);
+
     std::cout << "Building adjacency graph: " << std::endl;
     tex::Graph graph(num_faces);
     tex::build_adjacency_graph(mesh, mesh_info, &graph);
@@ -108,7 +138,7 @@ int main(int argc, char **argv) {
         timer.measure("Calculating data costs");
 
         try {
-            tex::view_selection(data_costs, &graph, conf.settings);
+            tex::view_selection(data_costs, segments, &graph, conf.settings);
         } catch (std::runtime_error& e) {
             std::cerr << "\tOptimization failed: " << e.what() << std::endl;
             std::exit(EXIT_FAILURE);

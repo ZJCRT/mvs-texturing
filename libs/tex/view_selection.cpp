@@ -16,17 +16,20 @@
 TEX_NAMESPACE_BEGIN
 
 void
-view_selection(DataCosts const & data_costs, UniGraph * graph, Settings const &) {
+view_selection(DataCosts const & data_costs, Segmentation const & segmentation, UniGraph * graph, Settings const &) {
     using uint_t = unsigned int;
     using cost_t = float;
     constexpr uint_t simd_w = mapmap::sys_max_simd_width<cost_t>();
     using unary_t = mapmap::UnaryTable<cost_t, simd_w>;
     using pairwise_t = mapmap::PairwisePotts<cost_t, simd_w>;
 
-    /* Construct graph */
-    mapmap::Graph<cost_t> mgraph(graph->num_nodes());
+    auto num_faces = graph->num_nodes();
+    auto num_total_nodes = num_faces + segmentation.size();
 
-    for (std::size_t i = 0; i < graph->num_nodes(); ++i) {
+    /* Construct graph */
+    mapmap::Graph<cost_t> mgraph(num_total_nodes);
+
+    for (std::size_t i = 0; i < num_faces; ++i) {
         if (data_costs.col(i).empty()) continue;
 
         std::vector<std::size_t> adj_faces = graph->get_adj_nodes(i);
@@ -40,9 +43,17 @@ view_selection(DataCosts const & data_costs, UniGraph * graph, Settings const &)
             }
         }
     }
+
+    for (std::size_t seg_num = 0; seg_num < segmentation.size(); ++seg_num) {
+        auto & segment = segmentation[seg_num];
+        for (std::size_t j = 0; j < segment.size(); ++j) {
+            mgraph.add_edge(segment[j], num_faces + seg_num, 2.0f);
+        }
+    }
+
     mgraph.update_components();
 
-    mapmap::LabelSet<cost_t, simd_w> label_set(graph->num_nodes(), false);
+    mapmap::LabelSet<cost_t, simd_w> label_set(num_total_nodes, false);
     for (std::size_t i = 0; i < data_costs.cols(); ++i) {
         DataCosts::Column const & data_costs_for_node = data_costs.col(i);
 
@@ -59,8 +70,19 @@ view_selection(DataCosts const & data_costs, UniGraph * graph, Settings const &)
         label_set.set_label_set_for_node(i, labels);
     }
 
+    std::vector<mapmap::_iv_st<cost_t, simd_w> > all_views_labels(data_costs.rows());
+    std::vector<mapmap::_s_t<cost_t, simd_w> > equal_costs(data_costs.rows());
+    for(int i = 0; i < data_costs.rows(); ++i) {
+        all_views_labels[i] = i + 1;
+        equal_costs[i] = 1.0;
+    }
+
+    for (int i = 0; i < segmentation.size(); ++i) {
+        label_set.set_label_set_for_node(num_faces + i, all_views_labels);
+    }
+
     std::vector<unary_t> unaries;
-    unaries.reserve(data_costs.cols());
+    unaries.reserve(num_total_nodes);
     pairwise_t pairwise(1.0f);
     for (std::size_t i = 0; i < data_costs.cols(); ++i) {
         DataCosts::Column const & data_costs_for_node = data_costs.col(i);
@@ -81,6 +103,11 @@ view_selection(DataCosts const & data_costs, UniGraph * graph, Settings const &)
         unaries.back().set_costs(costs);
     }
 
+    for (int i = 0; i < segmentation.size(); ++i) {
+        unaries.emplace_back(num_faces + i, &label_set);
+        unaries.back().set_costs(equal_costs);
+    }
+
     mapmap::StopWhenReturnsDiminish<cost_t, simd_w> terminate(5, 0.01);
     std::vector<mapmap::_iv_st<cost_t, simd_w> > solution;
 
@@ -93,7 +120,7 @@ view_selection(DataCosts const & data_costs, UniGraph * graph, Settings const &)
     mapmap::mapMAP<cost_t, simd_w> solver;
     solver.set_graph(&mgraph);
     solver.set_label_set(&label_set);
-    for(std::size_t i = 0; i < graph->num_nodes(); ++i)
+    for(std::size_t i = 0; i < num_total_nodes; ++i)
         solver.set_unary(i, &unaries[i]);
     solver.set_pairwise(&pairwise);
     solver.set_logging_callback(display);
@@ -121,7 +148,7 @@ view_selection(DataCosts const & data_costs, UniGraph * graph, Settings const &)
     std::size_t num_labels = data_costs.rows() + 1;
     std::size_t undefined = 0;
     /* Extract resulting labeling from solver. */
-    for (std::size_t i = 0; i < graph->num_nodes(); ++i) {
+    for (std::size_t i = 0; i < num_faces; ++i) {
         int label = label_set.label_from_offset(i, solution[i]);
         if (label < 0 || num_labels <= static_cast<std::size_t>(label)) {
             throw std::runtime_error("Incorrect labeling");
