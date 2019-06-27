@@ -13,6 +13,7 @@
 #include <acc/bvh_tree.h>
 #include <Eigen/Core>
 #include <Eigen/LU>
+#include <map>
 
 #include "util.h"
 #include "histogram.h"
@@ -128,6 +129,46 @@ photometric_outlier_detection(std::vector<FaceProjectionInfo> * infos, Settings 
     return true;
 }
 
+
+/**
+ * Dampens the quality of an image if it has a different segement for that face 
+ * than the majority.
+ * 
+ * @param infos contains information about one face seen from several views
+ * @param settings runtime configuration.
+ */
+bool
+segmentation_outlier_detection(std::vector<FaceProjectionInfo> * infos, Settings const & settings) {
+    if (infos->size() == 0) return true;
+
+    std::map<unsigned int, unsigned int> histogram;
+    for (auto info_it = infos->begin(); info_it != infos->end(); ++info_it)
+    {
+        auto segment = info_it->segment_id;
+        ++histogram[segment];
+    }
+
+    auto maxi = std::max_element(
+                histogram.begin(),
+                histogram.end(),
+                []( std::pair<unsigned int, unsigned int> const &p1,
+                    std::pair<unsigned int, unsigned int> const &p2)
+                {
+                   return p1.second < p2.second;
+                });
+    unsigned int majority_segment = maxi->first;
+
+    std::for_each(
+                infos->begin(),
+                infos->end(),
+                [majority_segment](FaceProjectionInfo & info) {
+                    if (info.segment_id != majority_segment) info.quality = 0.0f;
+                });
+
+    return true;
+}
+
+
 void
 calculate_face_projection_infos(mve::TriangleMesh::ConstPtr mesh,
     std::vector<TextureView> * texture_views, Settings const & settings,
@@ -214,7 +255,7 @@ calculate_face_projection_infos(mve::TriangleMesh::ConstPtr mesh,
                     if (!visible) continue;
                 }
 
-                FaceProjectionInfo info = {j, 0.0f, math::Vec3f(0.0f, 0.0f, 0.0f)};
+                FaceProjectionInfo info = {j, 0.0f, math::Vec3f(0.0f, 0.0f, 0.0f), 0};
 
                 /* Calculate quality. */
                 texture_view->get_face_info(v1, v2, v3, &info, settings);
@@ -264,6 +305,7 @@ postprocess_face_infos(Settings const & settings,
         std::vector<FaceProjectionInfo> & infos = face_projection_infos->at(i);
         if (settings.outlier_removal != OUTLIER_REMOVAL_NONE) {
             photometric_outlier_detection(&infos, settings);
+            segmentation_outlier_detection(&infos, settings);
 
             infos.erase(std::remove_if(infos.begin(), infos.end(),
                 [](FaceProjectionInfo const & info) -> bool {return info.quality == 0.0f;}),

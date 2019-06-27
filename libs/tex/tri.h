@@ -40,6 +40,10 @@ class Tri {
 
         /** Returns the axis aligned bounding box. */
         Rect<float> get_aabb(void) const;
+
+        /** Returns the barycenter of the triangle. */
+        math::Vec2f get_center(void) const;
+
 };
 
 inline Rect<float>
@@ -81,6 +85,12 @@ Tri::get_area(void) const {
     math::Vec2f v = v3 - v1;
 
     return 0.5f * std::abs(u[0] * v[1] - u[1] * v[0]);
+}
+
+inline math::Vec2f
+Tri::get_center(void) const
+{
+    return math::Vec2f((v1[0] + v2[0] + v3[0]) / 3.0f, (v1[1] + v2[1] + v3[1]) / 3.0f);
 }
 
 #endif /* TEX_TRI_HEADER */
