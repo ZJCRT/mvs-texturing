@@ -253,6 +253,7 @@ TextureView::get_face_info(math::Vec3f const & v1, math::Vec3f const & v2,
     }
     auto center = tri.get_center();
     face_info->segment_id = image_segmentation->at(center[0], center[1], 0);
+    face_info->file_name = image_file;
 }
 
 bool

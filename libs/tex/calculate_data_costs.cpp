@@ -130,6 +130,13 @@ photometric_outlier_detection(std::vector<FaceProjectionInfo> * infos, Settings 
 }
 
 
+inline bool ends_with(std::string const & value, std::string const & ending)
+{
+    if (ending.size() > value.size()) return false;
+    return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
+}
+
+
 /**
  * Dampens the quality of an image if it has a different segement for that face 
  * than the majority.
@@ -157,14 +164,28 @@ segmentation_outlier_detection(std::vector<FaceProjectionInfo> * infos, Settings
                    return p1.second < p2.second;
                 });
     unsigned int majority_segment = maxi->first;
+    auto reject_minority_segments = [majority_segment](FaceProjectionInfo & info) {
+        if (info.segment_id != majority_segment) info.quality = 0.0f;
+    };
 
-    std::for_each(
-                infos->begin(),
-                infos->end(),
-                [majority_segment](FaceProjectionInfo & info) {
-                    if (info.segment_id != majority_segment) info.quality = 0.0f;
-                });
+    std::vector<std::string> selected_images = {"back_27.png" }; //"back_22.png", "back_23.png", "back_3.png", "back_4.png"};
+    auto selected_images_only = [&selected_images](FaceProjectionInfo & info) {
+        std::cout << info.file_name << std::endl;
+        if ( std::none_of(
+                 selected_images.begin(),
+                 selected_images.end(),
+                 [&](std::string & ending) { return ends_with(info.file_name, ending);})) {
+            info.quality = 0.0f;
+        }
+    };
 
+
+    if (majority_segment == 4 || majority_segment == 5) {
+        std::for_each(
+                    infos->begin(),
+                    infos->end(),
+                    selected_images_only);
+    }
     return true;
 }
 
@@ -304,8 +325,12 @@ postprocess_face_infos(Settings const & settings,
 
         std::vector<FaceProjectionInfo> & infos = face_projection_infos->at(i);
         if (settings.outlier_removal != OUTLIER_REMOVAL_NONE) {
-            photometric_outlier_detection(&infos, settings);
             segmentation_outlier_detection(&infos, settings);
+            infos.erase(std::remove_if(infos.begin(), infos.end(),
+                [](FaceProjectionInfo const & info) -> bool {return info.quality == 0.0f;}),
+                infos.end());
+
+            photometric_outlier_detection(&infos, settings);
 
             infos.erase(std::remove_if(infos.begin(), infos.end(),
                 [](FaceProjectionInfo const & info) -> bool {return info.quality == 0.0f;}),
