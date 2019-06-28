@@ -208,7 +208,7 @@ int main(int argc, char **argv) {
         std::cout << "Generating debug texture patches:" << std::endl;
         {
             tex::TexturePatches texture_patches;
-            generate_debug_embeddings(&texture_views);
+            tex::generate_debug_embeddings(&texture_views);
             tex::VertexProjectionInfos vertex_projection_infos; // Will only be written
             tex::generate_texture_patches(graph, mesh, mesh_info, &texture_views,
                 conf.settings, &vertex_projection_infos, &texture_patches);
@@ -221,6 +221,28 @@ int main(int argc, char **argv) {
             tex::build_model(mesh, texture_atlases, &model);
             std::cout << "\tSaving model... " << std::flush;
             tex::Model::save(model, conf.out_prefix + "_view_selection");
+            std::cout << "done." << std::endl;
+        }
+    }
+
+    if (conf.write_view_selection_model) {
+        texture_atlases.clear();
+        std::cout << "Generating segmentation texture patches:" << std::endl;
+        {
+            tex::TexturePatches texture_patches;
+            tex::generate_segmentation_embeddings(&texture_views);
+            tex::VertexProjectionInfos vertex_projection_infos; // Will only be written
+            tex::generate_texture_patches(graph, mesh, mesh_info, &texture_views,
+                conf.settings, &vertex_projection_infos, &texture_patches);
+            tex::generate_texture_atlases(&texture_patches, conf.settings, &texture_atlases);
+        }
+
+        std::cout << "Building segmentation objmodel:" << std::endl;
+        {
+            tex::Model model;
+            tex::build_model(mesh, texture_atlases, &model);
+            std::cout << "\tSaving model... " << std::flush;
+            tex::Model::save(model, conf.out_prefix + "_segmentation");
             std::cout << "done." << std::endl;
         }
     }

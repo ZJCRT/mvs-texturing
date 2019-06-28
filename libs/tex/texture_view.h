@@ -88,6 +88,8 @@ class TextureView {
         int get_height(void) const;
         /** Returns a reference pointer to the corresponding image. */
         mve::ByteImage::Ptr get_image(void) const;
+        /** Returns a reference pointer to the corresponding image. */
+        mve::ByteImage::Ptr get_segmentation_image(void) const;
 
         /** Exchange encapsulated image. */
         void bind_image(mve::ByteImage::Ptr new_image);
@@ -150,6 +152,12 @@ inline mve::ByteImage::Ptr
 TextureView::get_image(void) const {
     assert(image != NULL);
     return image;
+}
+
+inline mve::ByteImage::Ptr
+TextureView::get_segmentation_image(void) const {
+    assert(image_segmentation != NULL);
+    return image_segmentation;
 }
 
 inline bool

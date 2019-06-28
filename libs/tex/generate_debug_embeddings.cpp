@@ -107,4 +107,69 @@ generate_debug_embeddings(std::vector<TextureView> * texture_views) {
     }
 }
 
+void
+generate_segmentation_embeddings(std::vector<TextureView> * texture_views) {
+
+    // colors taken from segmentation program. They are in BGR order!
+    // atts = [0 'bg', 1 'skin', 2 'l_brow', 3 'r_brow', 4 'l_eye', 5 'r_eye', 6 'eye_g', 7 'l_ear', 8 'r_ear', 9 'ear_r',
+    //         10 'nose', 11 'mouth', 12 'u_lip', 13 'l_lip', 14 'neck', 15 'neck_l', 16 'cloth', 17 'hair', 18 'hat']
+
+    std::vector<math::Vec3uc> seg_colors{
+        {255, 0, 0}, {255, 85, 0}, {255, 170, 0},
+        {255, 0, 85}, {255, 0, 170},
+        {0, 255, 0}, {85, 255, 0}, {170, 255, 0},
+        {0, 255, 85}, {0, 255, 170},
+        {0, 0, 255}, {85, 0, 255}, {170, 0, 255},
+        {0, 85, 255}, {0, 170, 255},
+        {255, 255, 0}, {255, 255, 85}, {255, 255, 170},
+        {255, 0, 255}, {255, 85, 255}, {255, 170, 255},
+        {0, 255, 255}, {85, 255, 255}, {170, 255, 255}};
+
+    std::vector<math::Vec4f> rainbow_colors;
+    generate_debug_colors(rainbow_colors);
+
+
+    #pragma omp parallel for
+    for (std::size_t i = 0; i < texture_views->size(); ++i) {
+        TextureView * texture_view = &(texture_views->at(i));
+
+        mve::ByteImage::Ptr seg_image = texture_view->get_segmentation_image();
+        mve::ByteImage::Ptr image = mve::ByteImage::create(texture_view->get_width(), texture_view->get_height(), 3);
+        for(std::size_t idx = 0; idx < image->width() * image->height() * 3; idx += 3) {
+                math::Vec3uc & color = seg_colors[seg_image->at(idx / 3, 0) % seg_colors.size()];
+                image->at(idx) = color[2];
+                image->at(idx+1) = color[1];
+                image->at(idx+2) = color[0];
+        }
+
+        std::vector<math::Vec4f> colors;
+        generate_debug_colors(colors);
+
+        math::Vec4f float_color =  rainbow_colors[i % rainbow_colors.size()];
+        math::Vec3uc color;
+        color[0] = float_color[0] * 255.0f;
+        color[1] = float_color[1] * 255.0f;
+        color[2] = float_color[2] * 255.0f;
+        math::Vec3uc font_color = math::Vec3uc(0,0,0);
+
+        for(int ox=0; ox < image->width() - 13; ox += 13) {
+            for(int oy=0; oy < image->height() - 6; oy += 6) {
+                std::size_t id = texture_view->get_id();
+                int d0 = id / 100;
+                int d1 = (id % 100) / 10;
+                int d2 = id % 10;
+
+                print_number(image, ox, oy, d0, font_color);
+                print_number(image, ox + 4, oy, d1, font_color);
+                print_number(image, ox + 8, oy, d2, font_color);
+            }
+        }
+
+        texture_view->bind_image(image);
+
+        // texture_views->at(i).bind_segmentation_image();
+    }
+}
+
+
 TEX_NAMESPACE_END
