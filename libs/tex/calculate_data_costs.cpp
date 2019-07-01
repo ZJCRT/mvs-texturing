@@ -170,7 +170,6 @@ segmentation_outlier_detection(std::vector<FaceProjectionInfo> * infos, Settings
 
     std::vector<std::string> selected_images = {"back_27.png" }; //"back_22.png", "back_23.png", "back_3.png", "back_4.png"};
     auto selected_images_only = [&selected_images](FaceProjectionInfo & info) {
-        std::cout << info.file_name << std::endl;
         if ( std::none_of(
                  selected_images.begin(),
                  selected_images.end(),

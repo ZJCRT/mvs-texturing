@@ -125,10 +125,6 @@ generate_segmentation_embeddings(std::vector<TextureView> * texture_views) {
         {255, 0, 255}, {255, 85, 255}, {255, 170, 255},
         {0, 255, 255}, {85, 255, 255}, {170, 255, 255}};
 
-    std::vector<math::Vec4f> rainbow_colors;
-    generate_debug_colors(rainbow_colors);
-
-
     #pragma omp parallel for
     for (std::size_t i = 0; i < texture_views->size(); ++i) {
         TextureView * texture_view = &(texture_views->at(i));
@@ -142,14 +138,6 @@ generate_segmentation_embeddings(std::vector<TextureView> * texture_views) {
                 image->at(idx+2) = color[0];
         }
 
-        std::vector<math::Vec4f> colors;
-        generate_debug_colors(colors);
-
-        math::Vec4f float_color =  rainbow_colors[i % rainbow_colors.size()];
-        math::Vec3uc color;
-        color[0] = float_color[0] * 255.0f;
-        color[1] = float_color[1] * 255.0f;
-        color[2] = float_color[2] * 255.0f;
         math::Vec3uc font_color = math::Vec3uc(0,0,0);
 
         for(int ox=0; ox < image->width() - 13; ox += 13) {
