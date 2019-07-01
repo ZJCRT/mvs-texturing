@@ -37,6 +37,9 @@ typedef SparseTable<std::uint32_t, std::uint16_t, float> DataCosts;
 typedef std::vector<std::vector<VertexProjectionInfo> > VertexProjectionInfos;
 typedef std::vector<std::vector<FaceProjectionInfo> > FaceProjectionInfos;
 
+/** the Segmentation structure stores the selected segment for each face. */
+using Segmentation = std::vector<std::uint16_t>;
+
 /**
   * prepares the mesh for texturing
   *  -removes duplicated faces
@@ -66,7 +69,7 @@ build_adjacency_graph(mve::TriangleMesh::ConstPtr mesh,
 void
 calculate_data_costs(mve::TriangleMesh::ConstPtr mesh,
     TextureViews * texture_views, Settings const & settings,
-    DataCosts * data_costs);
+    Segmentation * segmentation, DataCosts * data_costs);
 
 void
 postprocess_face_infos(Settings const & settings,

@@ -145,25 +145,10 @@ inline bool ends_with(std::string const & value, std::string const & ending)
  * @param settings runtime configuration.
  */
 bool
-segmentation_outlier_detection(std::vector<FaceProjectionInfo> * infos, Settings const & settings) {
+segmentation_outlier_detection(std::uint16_t const & majority_segment, std::vector<FaceProjectionInfo> * infos, Settings const & settings) {
+
     if (infos->size() == 0) return true;
 
-    std::map<unsigned int, unsigned int> histogram;
-    for (auto info_it = infos->begin(); info_it != infos->end(); ++info_it)
-    {
-        auto segment = info_it->segment_id;
-        ++histogram[segment];
-    }
-
-    auto maxi = std::max_element(
-                histogram.begin(),
-                histogram.end(),
-                []( std::pair<unsigned int, unsigned int> const &p1,
-                    std::pair<unsigned int, unsigned int> const &p2)
-                {
-                   return p1.second < p2.second;
-                });
-    unsigned int majority_segment = maxi->first;
     auto reject_minority_segments = [majority_segment](FaceProjectionInfo & info) {
         if (info.segment_id != majority_segment) info.quality = 0.0f;
     };
@@ -312,7 +297,49 @@ calculate_face_projection_infos(mve::TriangleMesh::ConstPtr mesh,
 }
 
 void
-postprocess_face_infos(Settings const & settings,
+calculate_face_segmentation(FaceProjectionInfos const &face_projection_infos, Segmentation * segmentation)
+{
+    static const std::uint16_t NO_SEGMENT = 0;
+
+    ProgressCounter face_counter("\tCalculate faces segmentation",
+        face_projection_infos.size());
+
+    segmentation->resize(face_projection_infos.size());
+    #pragma omp parallel for schedule(dynamic)
+    for (std::size_t i = 0; i < face_projection_infos.size(); ++i) {
+        face_counter.progress<SIMPLE>();
+
+        std::vector<FaceProjectionInfo> const & infos = face_projection_infos.at(i);
+
+        if (infos.size() == 0)
+        {
+            segmentation->at(i) = NO_SEGMENT;
+            continue;
+        }
+
+        std::map<std::uint16_t, std::uint16_t> histogram;
+        for(auto info : infos) {
+             ++histogram[info.segment_id];
+        };
+
+        auto maxi = std::max_element(
+                    histogram.begin(),
+                    histogram.end(),
+                    []( std::pair<unsigned int, unsigned int> const &p1,
+                        std::pair<unsigned int, unsigned int> const &p2)
+                    {
+                       return p1.second < p2.second;
+                    });
+        unsigned int majority_segment = maxi->first;
+        segmentation->at(i) = majority_segment;
+        face_counter.inc();
+    }
+}
+
+void
+postprocess_face_infos(
+        Settings const & settings,
+        Segmentation const & segmentation,
         FaceProjectionInfos * face_projection_infos,
         DataCosts * data_costs) {
 
@@ -324,7 +351,7 @@ postprocess_face_infos(Settings const & settings,
 
         std::vector<FaceProjectionInfo> & infos = face_projection_infos->at(i);
         if (settings.outlier_removal != OUTLIER_REMOVAL_NONE) {
-            segmentation_outlier_detection(&infos, settings);
+            segmentation_outlier_detection(segmentation[i], &infos, settings);
             infos.erase(std::remove_if(infos.begin(), infos.end(),
                 [](FaceProjectionInfo const & info) -> bool {return info.quality == 0.0f;}),
                 infos.end());
@@ -373,7 +400,7 @@ postprocess_face_infos(Settings const & settings,
 
 void
 calculate_data_costs(mve::TriangleMesh::ConstPtr mesh, std::vector<TextureView> * texture_views,
-    Settings const & settings, DataCosts * data_costs) {
+    Settings const & settings, Segmentation * segmentation, DataCosts * data_costs) {
 
     std::size_t const num_faces = mesh->get_faces().size() / 3;
     std::size_t const num_views = texture_views->size();
@@ -385,7 +412,8 @@ calculate_data_costs(mve::TriangleMesh::ConstPtr mesh, std::vector<TextureView> 
 
     FaceProjectionInfos face_projection_infos(num_faces);
     calculate_face_projection_infos(mesh, texture_views, settings, &face_projection_infos);
-    postprocess_face_infos(settings, &face_projection_infos, data_costs);
+    calculate_face_segmentation(face_projection_infos, segmentation);
+    postprocess_face_infos(settings, *segmentation, &face_projection_infos, data_costs);
 }
 
 TEX_NAMESPACE_END

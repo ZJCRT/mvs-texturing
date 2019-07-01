@@ -77,6 +77,8 @@ int main(int argc, char **argv) {
 
     std::size_t const num_faces = mesh->get_faces().size() / 3;
 
+    tex::Segmentation segmentation;
+
     std::cout << "Building adjacency graph: " << std::endl;
     tex::Graph graph(num_faces);
     tex::build_adjacency_graph(mesh, mesh_info, &graph);
@@ -87,7 +89,7 @@ int main(int argc, char **argv) {
 
         tex::DataCosts data_costs(num_faces, texture_views.size());
         if (conf.data_cost_file.empty()) {
-            tex::calculate_data_costs(mesh, &texture_views, conf.settings, &data_costs);
+            tex::calculate_data_costs(mesh, &texture_views, conf.settings, &segmentation, &data_costs);
 
             if (conf.write_intermediate_results) {
                 std::cout << "\tWriting data cost file... " << std::flush;
