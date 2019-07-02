@@ -177,7 +177,7 @@ from_images_and_camera_files(std::string const & path,
 
 void
 from_nvm_scene(std::string const & nvm_file,
-    std::vector<TextureView> * texture_views, std::string const & tmp_dir)
+    std::vector<TextureView> * texture_views, std::string const & tmp_dir, std::string const & segmentation_image_dir)
 {
     std::vector<mve::NVMCameraInfo> nvm_cams;
     mve::Bundle::Ptr bundle = mve::load_nvm_bundle(nvm_file, &nvm_cams);
@@ -190,15 +190,8 @@ from_nvm_scene(std::string const & nvm_file,
         mve::CameraInfo& mve_cam = cameras[i];
         mve::NVMCameraInfo const& nvm_cam = nvm_cams[i];
 
-        const std::string path_to_images =
-                nvm_cam.filename.substr(0,nvm_cam.filename.find_last_of("/"));
-        std::string file_name_no_ext =
-                nvm_cam.filename.substr(nvm_cam.filename.find_last_of("/")+1,nvm_cam.filename.length());
-        file_name_no_ext = file_name_no_ext.substr(0,file_name_no_ext.find_last_of("."));
-        const std::string filename_segmentation = path_to_images+"/face_segments/"+file_name_no_ext+".png";
 
         mve::ByteImage::Ptr image = mve::image::load_file(nvm_cam.filename);
-        mve::ByteImage::Ptr image_segmentation = mve::image::load_file(filename_segmentation);
 
         int const maxdim = std::max(image->width(), image->height());
         mve_cam.flen = mve_cam.flen / static_cast<float>(maxdim);
@@ -206,11 +199,26 @@ from_nvm_scene(std::string const & nvm_file,
         image = mve::image::image_undistort_vsfm<uint8_t>
             (image, mve_cam.flen, nvm_cam.radial_distortion);
 
+        const std::string image_file = util::fs::join_path(
+            tmp_dir,
+            util::fs::replace_extension(util::fs::basename(nvm_cam.filename), "png" )
+        );
 
-        const std::string image_file = path_to_images + "/tmp/" + file_name_no_ext + ".png";
-        const std::string image_segmentation_file = path_to_images + "/tmp/" + file_name_no_ext + "_seg.png";
         mve::image::save_png_file(image, image_file);
-        mve::image::save_png_file(image_segmentation, image_segmentation_file);
+
+        std::string image_segmentation_file = "";
+
+        if (!segmentation_image_dir.empty()) {
+            const std::string base_seg_image_name =
+                    util::fs::replace_extension(util::fs::basename(nvm_cam.filename), "png");
+            const std::string filename_segmentation = util::fs::join_path(segmentation_image_dir, base_seg_image_name);
+
+            mve::ByteImage::Ptr image_segmentation = mve::image::load_file(filename_segmentation);
+
+            image_segmentation_file = util::fs::replace_extension(image_file,"seg.png");
+
+            mve::image::save_png_file(image_segmentation, image_segmentation_file);
+        }
 
         #pragma omp critical
         texture_views->push_back(TextureView(i, mve_cam, image_file,image_segmentation_file));
@@ -221,7 +229,7 @@ from_nvm_scene(std::string const & nvm_file,
 
 void
 generate_texture_views(std::string const & in_scene,
-    std::vector<TextureView> * texture_views, std::string const & tmp_dir)
+    std::vector<TextureView> * texture_views, std::string const & tmp_dir, std::string const & segmentation_image_dir)
 {
     /* Determine input format. */
 
@@ -230,7 +238,7 @@ generate_texture_views(std::string const & in_scene,
         std::string const & file = in_scene;
         std::string extension = util::string::uppercase(util::string::right(file, 3));
         if (extension == "NVM") {
-            from_nvm_scene(file, texture_views, tmp_dir);
+            from_nvm_scene(file, texture_views, tmp_dir, segmentation_image_dir);
         }
     }
 

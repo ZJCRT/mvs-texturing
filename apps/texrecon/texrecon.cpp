@@ -39,6 +39,14 @@ int main(int argc, char **argv) {
         std::exit(EXIT_FAILURE);
     }
 
+    tex::ViewsPerSegment views_per_segment;
+    if (!conf.views_per_segment_file.empty()) {
+        if (conf.segmentation_images_dir.empty()) {
+            std::cerr << "WARN: views_per_segment_file specifiled but no segmentation_images_dir given" << std::endl;
+        }
+        read_views_per_segment_file(conf.views_per_segment_file, &views_per_segment);
+    }
+
     std::string const out_dir = util::fs::dirname(conf.out_prefix);
 
     if (!util::fs::dir_exists(out_dir.c_str())) {
@@ -70,7 +78,7 @@ int main(int argc, char **argv) {
 
     std::cout << "Generating texture views: " << std::endl;
     tex::TextureViews texture_views;
-    tex::generate_texture_views(conf.in_scene, &texture_views, tmp_dir);
+    tex::generate_texture_views(conf.in_scene, &texture_views, tmp_dir, conf.segmentation_images_dir);
 
     write_string_to_file(conf.out_prefix + ".conf", conf.to_string());
     timer.measure("Loading");
@@ -89,7 +97,7 @@ int main(int argc, char **argv) {
 
         tex::DataCosts data_costs(num_faces, texture_views.size());
         if (conf.data_cost_file.empty()) {
-            tex::calculate_data_costs(mesh, &texture_views, conf.settings, &segmentation, &data_costs);
+            tex::calculate_data_costs(mesh, &texture_views, conf.settings, views_per_segment, &segmentation, &data_costs);
 
             if (conf.write_intermediate_results) {
                 std::cout << "\tWriting data cost file... " << std::flush;

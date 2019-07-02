@@ -125,20 +125,30 @@ generate_segmentation_embeddings(std::vector<TextureView> * texture_views) {
         {255, 0, 255}, {255, 85, 255}, {255, 170, 255},
         {0, 255, 255}, {85, 255, 255}, {170, 255, 255}};
 
+
+    math::Vec3uc font_color = math::Vec3uc(0,0,0);
+    math::Vec3uc alt_bg_color = math::Vec3uc(192, 192, 192);
+
     #pragma omp parallel for
     for (std::size_t i = 0; i < texture_views->size(); ++i) {
         TextureView * texture_view = &(texture_views->at(i));
 
         mve::ByteImage::Ptr seg_image = texture_view->get_segmentation_image();
         mve::ByteImage::Ptr image = mve::ByteImage::create(texture_view->get_width(), texture_view->get_height(), 3);
-        for(std::size_t idx = 0; idx < image->width() * image->height() * 3; idx += 3) {
-                math::Vec3uc & color = seg_colors[seg_image->at(idx / 3, 0) % seg_colors.size()];
-                image->at(idx) = color[2];
-                image->at(idx+1) = color[1];
-                image->at(idx+2) = color[0];
+        if (seg_image == NULL)
+        {
+            image->fill_color(*alt_bg_color);
         }
-
-        math::Vec3uc font_color = math::Vec3uc(0,0,0);
+        else
+        {
+            const int num_pixels = static_cast<std::size_t>(image->width() * image->height());
+            for(std::size_t idx = 0; idx < num_pixels * 3; idx += 3) {
+                    math::Vec3uc & color = seg_colors[seg_image->at(idx / 3, 0) % seg_colors.size()];
+                    image->at(idx) = color[2];
+                    image->at(idx+1) = color[1];
+                    image->at(idx+2) = color[0];
+            }
+        }
 
         for(int ox=0; ox < image->width() - 13; ox += 13) {
             for(int oy=0; oy < image->height() - 6; oy += 6) {

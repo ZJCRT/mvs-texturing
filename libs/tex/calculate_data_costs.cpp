@@ -144,33 +144,34 @@ inline bool ends_with(std::string const & value, std::string const & ending)
  * @param infos contains information about one face seen from several views
  * @param settings runtime configuration.
  */
-bool
-segmentation_outlier_detection(std::uint16_t const & majority_segment, std::vector<FaceProjectionInfo> * infos, Settings const & settings) {
+void
+segmentation_outlier_detection(std::uint16_t const & majority_segment, ViewsPerSegment const & views_per_segment,
+                               std::vector<FaceProjectionInfo> * infos) {
 
-    if (infos->size() == 0) return true;
+    if (infos->size() == 0) return;
 
-    auto reject_minority_segments = [majority_segment](FaceProjectionInfo & info) {
-        if (info.segment_id != majority_segment) info.quality = 0.0f;
-    };
+//    auto reject_minority_segments = [majority_segment](FaceProjectionInfo & info) {
+//        if (info.segment_id != majority_segment) info.quality = 0.0f;
+//    };
 
-    std::vector<std::string> selected_images = {"back_27.png" }; //"back_22.png", "back_23.png", "back_3.png", "back_4.png"};
-    auto selected_images_only = [&selected_images](FaceProjectionInfo & info) {
+    auto views_it = views_per_segment.find(majority_segment);
+    if (views_it == views_per_segment.end()) return;
+
+    const auto & selected_images = views_it->second; //views_per_segment.at{"back_27.png" }; //"back_22.png", "back_23.png", "back_3.png", "back_4.png"};
+
+    auto selected_views_only = [&selected_images](FaceProjectionInfo & info) {
         if ( std::none_of(
                  selected_images.begin(),
                  selected_images.end(),
-                 [&](std::string & ending) { return ends_with(info.file_name, ending);})) {
+                 [&](std::uint16_t view_id) { return info.view_id == view_id; })) {
             info.quality = 0.0f;
         }
     };
 
-
-    if (majority_segment == 4 || majority_segment == 5) {
-        std::for_each(
-                    infos->begin(),
-                    infos->end(),
-                    selected_images_only);
-    }
-    return true;
+    std::for_each(
+                infos->begin(),
+                infos->end(),
+                selected_views_only);
 }
 
 
@@ -339,6 +340,7 @@ calculate_face_segmentation(FaceProjectionInfos const &face_projection_infos, Se
 void
 postprocess_face_infos(
         Settings const & settings,
+        ViewsPerSegment const & views_per_segment,
         Segmentation const & segmentation,
         FaceProjectionInfos * face_projection_infos,
         DataCosts * data_costs) {
@@ -351,7 +353,7 @@ postprocess_face_infos(
 
         std::vector<FaceProjectionInfo> & infos = face_projection_infos->at(i);
         if (settings.outlier_removal != OUTLIER_REMOVAL_NONE) {
-            segmentation_outlier_detection(segmentation[i], &infos, settings);
+            segmentation_outlier_detection(segmentation[i], views_per_segment, &infos);
             infos.erase(std::remove_if(infos.begin(), infos.end(),
                 [](FaceProjectionInfo const & info) -> bool {return info.quality == 0.0f;}),
                 infos.end());
@@ -400,7 +402,8 @@ postprocess_face_infos(
 
 void
 calculate_data_costs(mve::TriangleMesh::ConstPtr mesh, std::vector<TextureView> * texture_views,
-    Settings const & settings, Segmentation * segmentation, DataCosts * data_costs) {
+    Settings const & settings, ViewsPerSegment const & views_per_segment,
+    Segmentation * segmentation, DataCosts * data_costs) {
 
     std::size_t const num_faces = mesh->get_faces().size() / 3;
     std::size_t const num_views = texture_views->size();
@@ -413,7 +416,7 @@ calculate_data_costs(mve::TriangleMesh::ConstPtr mesh, std::vector<TextureView> 
     FaceProjectionInfos face_projection_infos(num_faces);
     calculate_face_projection_infos(mesh, texture_views, settings, &face_projection_infos);
     calculate_face_segmentation(face_projection_infos, segmentation);
-    postprocess_face_infos(settings, *segmentation, &face_projection_infos, data_costs);
+    postprocess_face_infos(settings, views_per_segment, *segmentation, &face_projection_infos, data_costs);
 }
 
 TEX_NAMESPACE_END

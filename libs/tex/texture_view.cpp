@@ -98,7 +98,7 @@ TextureView::load_image(void) {
     if(image != NULL) return;
     image = mve::image::load_file(image_file);
     if(image_segmentation != NULL) return;
-    if(image_segmentation_file.length() == 0) return;
+    if(image_segmentation_file.empty()) return;
     image_segmentation = mve::image::load_file(image_segmentation_file);
 }
 
@@ -252,8 +252,13 @@ TextureView::get_face_info(math::Vec3f const & v1, math::Vec3f const & v2,
         case DATA_TERM_GMI:  face_info->quality = gmi; break;
     }
     auto center = tri.get_center();
-    face_info->segment_id = image_segmentation->at(center[0], center[1], 0);
-    face_info->file_name = image_file;
+    if (image_segmentation == NULL) {
+        face_info->segment_id = 0;
+    }
+    else
+    {
+        face_info->segment_id = image_segmentation->at(center[0], center[1], 0);
+    }
 }
 
 bool

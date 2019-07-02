@@ -11,6 +11,7 @@
 #define TEX_TEXTURING_HEADER
 
 #include <vector>
+#include <map>
 
 #include "mve/mesh.h"
 #include "mve/mesh_info.h"
@@ -40,6 +41,10 @@ typedef std::vector<std::vector<FaceProjectionInfo> > FaceProjectionInfos;
 /** the Segmentation structure stores the selected segment for each face. */
 using Segmentation = std::vector<std::uint16_t>;
 
+/** a list of view_id represent the allowed views per segment.
+ *  unlisted segments are not restricted. */
+using ViewsPerSegment = std::map< std::uint16_t, std::vector<std::uint16_t> >;
+
 /**
   * prepares the mesh for texturing
   *  -removes duplicated faces
@@ -53,7 +58,7 @@ prepare_mesh(mve::MeshInfo * mesh_info, mve::TriangleMesh::Ptr mesh);
   */
 void
 generate_texture_views(std::string const & in_scene,
-    TextureViews * texture_views, std::string const & tmp_dir);
+    TextureViews * texture_views, std::string const & tmp_dir, std::string const & segmentation_image_dir);
 
 /**
   * Builds up the meshes face adjacency graph using the vertex_infos
@@ -69,10 +74,12 @@ build_adjacency_graph(mve::TriangleMesh::ConstPtr mesh,
 void
 calculate_data_costs(mve::TriangleMesh::ConstPtr mesh,
     TextureViews * texture_views, Settings const & settings,
+    ViewsPerSegment const & views_per_segment,
     Segmentation * segmentation, DataCosts * data_costs);
 
 void
 postprocess_face_infos(Settings const & settings,
+    ViewsPerSegment const & views_per_segment,
     FaceProjectionInfos * projected_face_infos,
     DataCosts * data_costs);
 

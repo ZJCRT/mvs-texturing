@@ -26,6 +26,8 @@
 #include "math/matrix.h"
 #include "math/functions.h"
 
+#include "texturing.h"
+
 /**
  * Converts an MVE matrix into an Eigen matrix.
  */
@@ -157,5 +159,40 @@ get_jet_color(float value) {
     float blue  = math::clamp(std::min(mvalue + 0.5f, -mvalue + 2.5f));
     return math::Vec4f(red, green, blue, 1.0f);
 }
+
+inline void
+read_views_per_segment_file(std::string const & filename, tex::ViewsPerSegment * views_per_segment)
+{
+
+    std::ifstream in(filename);
+    if (!in.good())
+        throw util::FileException(filename, std::strerror(errno));
+
+    int num_segments;
+    in >> num_segments;
+
+    for (int i = 0; i < num_segments; ++i) {
+        std::uint16_t segment;
+        in >> segment;
+
+        int num_views;
+        in >> num_views;
+
+        std::vector<std::uint16_t> views(num_views);
+        for(int j = 0; j < num_views; ++j) in >> views[j];
+
+        tex::ViewsPerSegment::iterator found_it;
+        if ((found_it = views_per_segment->find(segment)) != views_per_segment->end()) {
+            std::stringstream strstr;
+            strstr << "WARN: segment " << segment << "already mentioned in " << filename
+                   << " (with " << found_it->second.size() << "views)."
+                   << "additional mention (with " << num_views << "views gnored." << std::endl;
+            continue;
+        }
+        views_per_segment->emplace(segment, std::move(views));
+    }
+}
+
+
 
 #endif /* TEX_UTIL_HEADER */

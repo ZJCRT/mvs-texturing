@@ -28,7 +28,6 @@ struct FaceProjectionInfo {
     float quality;
     math::Vec3f mean_color;
     std::uint16_t segment_id; // 4: 'l_eye' 	5: 'r_eye'
-    std::string file_name;
     bool operator<(FaceProjectionInfo const & other) const {
         return view_id < other.view_id;
     }
@@ -157,7 +156,6 @@ TextureView::get_image(void) const {
 
 inline mve::ByteImage::Ptr
 TextureView::get_segmentation_image(void) const {
-    assert(image_segmentation != NULL);
     return image_segmentation;
 }
 
