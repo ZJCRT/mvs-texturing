@@ -305,7 +305,9 @@ calculate_face_segmentation(FaceProjectionInfos const &face_projection_infos, Se
     ProgressCounter face_counter("\tCalculate faces segmentation",
         face_projection_infos.size());
 
-    segmentation->resize(face_projection_infos.size());
+    std::uint16_t max_seg_id = 0;
+
+    segmentation->set_num_faces(face_projection_infos.size());
     #pragma omp parallel for schedule(dynamic)
     for (std::size_t i = 0; i < face_projection_infos.size(); ++i) {
         face_counter.progress<SIMPLE>();
@@ -314,7 +316,7 @@ calculate_face_segmentation(FaceProjectionInfos const &face_projection_infos, Se
 
         if (infos.size() == 0)
         {
-            segmentation->at(i) = NO_SEGMENT;
+            (*segmentation)[i] = NO_SEGMENT;
             continue;
         }
 
@@ -331,10 +333,12 @@ calculate_face_segmentation(FaceProjectionInfos const &face_projection_infos, Se
                     {
                        return p1.second < p2.second;
                     });
-        unsigned int majority_segment = maxi->first;
-        segmentation->at(i) = majority_segment;
+        std::uint16_t majority_segment = maxi->first;
+        (*segmentation)[i] = majority_segment;
+        max_seg_id = std::max(max_seg_id, majority_segment);
         face_counter.inc();
     }
+    segmentation->set_num_segments(max_seg_id + 1);
 }
 
 void

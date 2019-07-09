@@ -141,7 +141,7 @@ generate_segmentation_embeddings(std::vector<TextureView> * texture_views) {
         }
         else
         {
-            const int num_pixels = static_cast<std::size_t>(image->width() * image->height());
+            const std::size_t num_pixels = static_cast<std::size_t>(image->width() * image->height());
             for(std::size_t idx = 0; idx < num_pixels * 3; idx += 3) {
                     math::Vec3uc & color = seg_colors[seg_image->at(idx / 3, 0) % seg_colors.size()];
                     image->at(idx) = color[2];
