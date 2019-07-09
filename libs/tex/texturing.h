@@ -11,7 +11,6 @@
 #define TEX_TEXTURING_HEADER
 
 #include <vector>
-#include <map>
 
 #include "mve/mesh.h"
 #include "mve/mesh_info.h"
