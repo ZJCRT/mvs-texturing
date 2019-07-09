@@ -255,8 +255,7 @@ TextureView::get_face_info(math::Vec3f const & v1, math::Vec3f const & v2,
     if (image_segmentation == NULL) {
         face_info->segment_id = 0;
     }
-    else
-    {
+    else {
         face_info->segment_id = image_segmentation->at(center[0], center[1], 0);
     }
 }
