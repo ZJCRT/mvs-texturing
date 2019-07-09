@@ -118,7 +118,7 @@ int main(int argc, char **argv) {
         timer.measure("Calculating data costs");
 
         try {
-            tex::view_selection(data_costs, &graph, conf.settings);
+            tex::view_selection(data_costs, &graph, segmentation, conf.settings);
         } catch (std::runtime_error& e) {
             std::cerr << "\tOptimization failed: " << e.what() << std::endl;
             std::exit(EXIT_FAILURE);

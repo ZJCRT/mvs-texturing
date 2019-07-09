@@ -40,9 +40,9 @@ UniGraph::get_subgraphs(std::size_t label,
                 subgraphs->back().push_back(node);
 
                 /* Add all unused neighbours with the same label to the queue. */
-                std::vector<std::size_t> const & adj_list = adj_lists[node];
+                std::vector<WeightedEdge> const & adj_list = adj_lists[node];
                 for(std::size_t j = 0; j < adj_list.size(); ++j) {
-                    std::size_t adj_node = adj_list[j];
+                    std::size_t adj_node = adj_list[j].first;
                     assert(adj_node < labels.size() && adj_node < used.size());
                     if (labels[adj_node] == label && !used[adj_node]){
                         queue.push_back(adj_node);

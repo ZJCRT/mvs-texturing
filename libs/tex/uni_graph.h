@@ -18,8 +18,12 @@
   * Implementation of a unidirectional graph with fixed amount of nodes using adjacency lists.
   */
 class UniGraph {
+    public:
+        using Cost = float;
+        using WeightedEdge = std::pair<std::size_t, Cost>;
+
     private:
-        std::vector<std::vector<std::size_t> > adj_lists;
+        std::vector<std::vector<WeightedEdge> > adj_lists;
         std::vector<std::size_t> labels;
         std::size_t edges;
 
@@ -32,10 +36,10 @@ class UniGraph {
 
         /**
           * Adds an edge between the nodes with indices n1 and n2.
-          * If the edge exists nothing happens.
+          * If the edge exists weight is added.
           * @warning asserts that the indices are valid.
           */
-        void add_edge(std::size_t n1, std::size_t n2);
+        void add_edge(std::size_t n1, std::size_t n2, Cost weight = 1.0);
 
         /**
           * Removes the edge between the nodes with indices n1 and n2.
@@ -74,39 +78,42 @@ class UniGraph {
           */
         void get_subgraphs(std::size_t label, std::vector<std::vector<std::size_t> > * subgraphs) const;
 
-        std::vector<std::size_t> const & get_adj_nodes(std::size_t node) const;
+        std::vector<WeightedEdge> const & get_adj_nodes(std::size_t node) const;
 };
 
 inline void
-UniGraph::add_edge(std::size_t n1, std::size_t n2) {
+UniGraph::add_edge(std::size_t n1, std::size_t n2, Cost weight /* = 1.0 */) {
     assert(n1 < num_nodes() && n2 < num_nodes());
-    if (!has_edge(n1, n2)) {
-        adj_lists[n1].push_back(n2);
-        adj_lists[n2].push_back(n1);
+
+    auto & n1_edges = adj_lists[n1];
+    auto is_connected_to_n2 = [n2](const WeightedEdge & e) { return e.first == n2;};
+    auto edge_from_n1 = std::find_if(n1_edges.begin(), n1_edges.end(), is_connected_to_n2);
+
+    if (edge_from_n1 == n1_edges.end()) {
+        adj_lists[n1].emplace_back(n2, weight);
+        adj_lists[n2].emplace_back(n1, weight);
         ++edges;
     }
-}
+    else
+    {
+        auto & n2_edges = adj_lists[n2];
+        auto is_connected_to_n1 = [n1](const WeightedEdge & e) { return e.first == n1; };
+        auto edge_from_n2 = std::find_if(n2_edges.begin(), n2_edges.end(), is_connected_to_n1);
 
-inline void
-delete_element(std::vector<std::size_t> * vec, std::size_t element) {
-    vec->erase(std::remove(vec->begin(), vec->end(), element), vec->end());
-}
+        assert(edge_from_n1->second == edge_from_n2->second);
 
-inline void
-UniGraph::remove_edge(std::size_t n1, std::size_t n2) {
-    assert(n1 < num_nodes() && n2 < num_nodes());
-    if (has_edge(n1, n2)){
-        delete_element(&adj_lists[n1], n2);
-        delete_element(&adj_lists[n2], n1);
-        --edges;
+        edge_from_n1->second += weight;
+        edge_from_n2->second += weight;
     }
 }
 
 inline bool
 UniGraph::has_edge(std::size_t n1, std::size_t n2) const {
     assert(n1 < num_nodes() && n2 < num_nodes());
-    std::vector<std::size_t> const & adj_list = adj_lists[n1];
-    return std::find(adj_list.begin(), adj_list.end(), n2) != adj_list.end();
+
+    std::vector<WeightedEdge> const & adj_list = adj_lists[n1];
+    auto is_connected_to_n2 = [n2](const WeightedEdge & e) { return e.first == n2;};
+    return std::find_if(adj_list.begin(), adj_list.end(), is_connected_to_n2) != adj_list.end();
 }
 
 inline std::size_t
@@ -131,7 +138,7 @@ UniGraph::get_label(std::size_t n) const {
     return labels[n];
 }
 
-inline std::vector<std::size_t> const &
+inline std::vector<UniGraph::WeightedEdge> const &
 UniGraph::get_adj_nodes(std::size_t node) const {
     assert(node < num_nodes());
     return adj_lists[node];

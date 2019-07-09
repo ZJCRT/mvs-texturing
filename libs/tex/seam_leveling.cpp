@@ -23,8 +23,9 @@ find_seam_edges(UniGraph const & graph, mve::TriangleMesh::ConstPtr mesh,
     // Is it possible that a single edge is part of more than three faces whichs' label is non zero???
 
     for (std::size_t node = 0; node < graph.num_nodes(); ++node) {
-        std::vector<std::size_t> const & adj_nodes = graph.get_adj_nodes(node);
-        for (std::size_t adj_node : adj_nodes) {
+        std::vector<UniGraph::WeightedEdge> const & adj_nodes = graph.get_adj_nodes(node);
+        for (const auto & adj_edge : adj_nodes) {
+            std::size_t adj_node = adj_edge.first;
             /* Add each edge only once. */
             if (node > adj_node) continue;
 
