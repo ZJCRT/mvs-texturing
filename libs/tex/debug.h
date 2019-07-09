@@ -19,6 +19,10 @@ TEX_NAMESPACE_BEGIN
 void
 generate_debug_embeddings(std::vector<TextureView> * texture_views);
 
+/** Replaces the encapsuled image of the texture_views with the segmentation_images */
+void
+generate_segmentation_embeddings(std::vector<TextureView> * texture_views);
+
 TEX_NAMESPACE_END
 
 #endif /* TEX_DEBUG_HEADER */

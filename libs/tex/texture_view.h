@@ -27,7 +27,7 @@ struct FaceProjectionInfo {
     std::uint16_t view_id;
     float quality;
     math::Vec3f mean_color;
-
+    std::uint16_t segment_id;
     bool operator<(FaceProjectionInfo const & other) const {
         return view_id < other.view_id;
     }
@@ -47,7 +47,9 @@ class TextureView {
         int width;
         int height;
         std::string image_file;
+        std::string image_segmentation_file;
         mve::ByteImage::Ptr image;
+        mve::ByteImage::Ptr image_segmentation;
         mve::ByteImage::Ptr gradient_magnitude;
         std::vector<bool> validity_mask;
 
@@ -74,7 +76,7 @@ class TextureView {
         math::Vec3f get_pixel_values(math::Vec2f const & pixel) const;
 
         /** Constructs a TextureView from the give mve::CameraInfo containing the given image. */
-        TextureView(std::size_t id, mve::CameraInfo const & camera, std::string const & image_file);
+        TextureView(std::size_t id, mve::CameraInfo const & camera, std::string const & image_file, std::string const & image_segmentation_file);
 
         /** Returns the position. */
         math::Vec3f get_pos(void) const;
@@ -86,6 +88,8 @@ class TextureView {
         int get_height(void) const;
         /** Returns a reference pointer to the corresponding image. */
         mve::ByteImage::Ptr get_image(void) const;
+        /** Returns a reference pointer to the corresponding image. */
+        mve::ByteImage::Ptr get_segmentation_image(void) const;
 
         /** Exchange encapsulated image. */
         void bind_image(mve::ByteImage::Ptr new_image);
@@ -148,6 +152,11 @@ inline mve::ByteImage::Ptr
 TextureView::get_image(void) const {
     assert(image != NULL);
     return image;
+}
+
+inline mve::ByteImage::Ptr
+TextureView::get_segmentation_image(void) const {
+    return image_segmentation;
 }
 
 inline bool

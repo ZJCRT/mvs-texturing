@@ -37,6 +37,33 @@ typedef SparseTable<std::uint32_t, std::uint16_t, float> DataCosts;
 typedef std::vector<std::vector<VertexProjectionInfo> > VertexProjectionInfos;
 typedef std::vector<std::vector<FaceProjectionInfo> > FaceProjectionInfos;
 
+/** the Segmentation structure stores the selected segment for each face. */
+class Segmentation
+{
+    std::vector<std::uint16_t> segments;
+    std::uint16_t num_segments;
+
+public:
+    Segmentation()
+     : num_segments(0)
+    {}
+
+    std::uint16_t operator[](size_t idx) const { return segments[idx]; }
+    std::uint16_t & operator[](size_t idx) { return segments[idx]; }
+
+    /** set num faces (call it before accessing via [] !) */
+    void set_num_faces(size_t new_size) { segments.resize(new_size); }
+    size_t get_num_faces() const { return segments.size(); }
+
+    /** set num segments. just informal. should include the zero segment. */
+    void set_num_segments(std::uint16_t new_num_segments) { num_segments = new_num_segments; }
+    std::uint16_t get_num_segments() const { return num_segments; }
+};
+
+/** a list of view_id represent the allowed views per segment.
+ *  unlisted segments are not restricted. */
+using ViewsPerSegment = std::map< std::uint16_t, std::vector<std::uint16_t> >;
+
 /**
   * prepares the mesh for texturing
   *  -removes duplicated faces
@@ -50,7 +77,7 @@ prepare_mesh(mve::MeshInfo * mesh_info, mve::TriangleMesh::Ptr mesh);
   */
 void
 generate_texture_views(std::string const & in_scene,
-    TextureViews * texture_views, std::string const & tmp_dir);
+    TextureViews * texture_views, std::string const & tmp_dir, std::string const & segmentation_image_dir);
 
 /**
   * Builds up the meshes face adjacency graph using the vertex_infos
@@ -66,10 +93,12 @@ build_adjacency_graph(mve::TriangleMesh::ConstPtr mesh,
 void
 calculate_data_costs(mve::TriangleMesh::ConstPtr mesh,
     TextureViews * texture_views, Settings const & settings,
-    DataCosts * data_costs);
+    ViewsPerSegment const & views_per_segment,
+    Segmentation * segmentation, DataCosts * data_costs);
 
 void
 postprocess_face_infos(Settings const & settings,
+    ViewsPerSegment const & views_per_segment,
     FaceProjectionInfos * projected_face_infos,
     DataCosts * data_costs);
 
@@ -77,7 +106,7 @@ postprocess_face_infos(Settings const & settings,
  * Runs the view selection procedure and saves the labeling in the graph
  */
 void
-view_selection(DataCosts const & data_costs, UniGraph * graph, Settings const & settings);
+view_selection(DataCosts const & data_costs, UniGraph * graph, Segmentation const & segmentation, Settings const & settings);
 
 /**
   * Generates texture patches using the graph to determine adjacent faces with the same label.

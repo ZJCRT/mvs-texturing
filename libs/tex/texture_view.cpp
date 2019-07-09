@@ -18,8 +18,8 @@
 TEX_NAMESPACE_BEGIN
 
 TextureView::TextureView(std::size_t id, mve::CameraInfo const & camera,
-    std::string const & image_file)
-    : id(id), image_file(image_file) {
+    std::string const & image_file, std::string const & image_segmentation_file)
+    : id(id), image_file(image_file), image_segmentation_file(image_segmentation_file) {
 
     mve::image::ImageHeaders header;
     try {
@@ -97,6 +97,9 @@ void
 TextureView::load_image(void) {
     if(image != NULL) return;
     image = mve::image::load_file(image_file);
+    if(image_segmentation != NULL) return;
+    if(image_segmentation_file.empty()) return;
+    image_segmentation = mve::image::load_file(image_segmentation_file);
 }
 
 void
@@ -247,6 +250,13 @@ TextureView::get_face_info(math::Vec3f const & v1, math::Vec3f const & v2,
     switch (settings.data_term) {
         case DATA_TERM_AREA: face_info->quality = area; break;
         case DATA_TERM_GMI:  face_info->quality = gmi; break;
+    }
+    auto center = tri.get_center();
+    if (image_segmentation == NULL) {
+        face_info->segment_id = 0;
+    }
+    else {
+        face_info->segment_id = image_segmentation->at(center[0], center[1], 0);
     }
 }
 

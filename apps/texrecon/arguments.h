@@ -21,6 +21,8 @@ struct Arguments {
 
     std::string data_cost_file;
     std::string labeling_file;
+    std::string views_per_segment_file;
+    std::string segmentation_images_dir;
 
     tex::Settings settings;
 
@@ -28,7 +30,7 @@ struct Arguments {
     bool write_intermediate_results;
     bool write_view_selection_model;
 
-    /** Returns a muliline string of the current arguments. */
+    /** Returns a multiline string of the current arguments. */
     std::string to_string();
 };
 

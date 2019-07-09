@@ -86,6 +86,11 @@ Arguments parse_args(int argc, char **argv) {
         "Write out timings for each algorithm step (OUT_PREFIX + _timings.csv)");
     args.add_option('\0', NO_INTERMEDIATE_RESULTS, false,
         "Do not write out intermediate results");
+    args.add_option('S',"segmentation_image_dir", true,
+        "directory to segmentation images. each file there must be named <image_name_wo_ext.png>");
+    args.add_option('V',"views_per_segment_file", true,
+        "the segment->image mapping in the given file is used to constrain views for faces with that segments");
+
     args.parse(argc, argv);
 
     Arguments conf;
@@ -145,6 +150,12 @@ Arguments parse_args(int argc, char **argv) {
                 throw std::invalid_argument("Invalid long option");
             }
         break;
+        case 'S':
+            conf.segmentation_images_dir = i->arg;
+            break;
+        case 'V':
+            conf.views_per_segment_file = i->arg;
+            break;
         default:
             throw std::invalid_argument("Invalid short option");
         }
@@ -171,7 +182,9 @@ Arguments::to_string(){
         << "Outlier removal method: \t" << choice_string<tex::OutlierRemoval>(settings.outlier_removal) << std::endl
         << "Tone mapping: \t" << choice_string<tex::ToneMapping>(settings.tone_mapping) << std::endl
         << "Apply global seam leveling: \t" << bool_to_string(settings.global_seam_leveling) << std::endl
-        << "Apply local seam leveling: \t" << bool_to_string(settings.local_seam_leveling) << std::endl;
+        << "Apply local seam leveling: \t" << bool_to_string(settings.local_seam_leveling) << std::endl
+        << "segmentation images directory: \t" << segmentation_images_dir << std::endl
+        << "views per segment file: \t" << views_per_segment_file << std::endl;
 
     return out.str();
 }
