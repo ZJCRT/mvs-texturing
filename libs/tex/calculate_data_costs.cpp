@@ -129,14 +129,6 @@ photometric_outlier_detection(std::vector<FaceProjectionInfo> * infos, Settings 
     return true;
 }
 
-
-inline bool ends_with(std::string const & value, std::string const & ending)
-{
-    if (ending.size() > value.size()) return false;
-    return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
-}
-
-
 /**
  * Dampens the quality of an image if it has a different segement for that face 
  * than the majority.
@@ -157,7 +149,7 @@ segmentation_outlier_detection(std::uint16_t const & majority_segment, ViewsPerS
     auto views_it = views_per_segment.find(majority_segment);
     if (views_it == views_per_segment.end()) return;
 
-    const auto & selected_images = views_it->second; //views_per_segment.at{"back_27.png" }; //"back_22.png", "back_23.png", "back_3.png", "back_4.png"};
+    const auto & selected_images = views_it->second;
 
     auto selected_views_only = [&selected_images](FaceProjectionInfo & info) {
         if ( std::none_of(
