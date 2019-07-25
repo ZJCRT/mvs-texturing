@@ -149,21 +149,17 @@ segmentation_outlier_detection(std::uint16_t const & majority_segment, ViewsPerS
     auto views_it = views_per_segment.find(majority_segment);
     if (views_it == views_per_segment.end()) return;
 
-    const auto & selected_images = views_it->second;
-
-    auto selected_views_only = [&selected_images](FaceProjectionInfo & info) {
-        if ( std::none_of(
-                 selected_images.begin(),
-                 selected_images.end(),
-                 [&](std::uint16_t view_id) { return info.view_id == view_id; })) {
-            info.quality = 0.0f;
+    const auto & allowed_view_ids = views_it->second;
+    for( auto & info : (*infos)) {
+        bool is_view_allowed = false;
+        for (auto allowed_view_id : allowed_view_ids) {
+            if (info.view_id == allowed_view_id)  {
+                is_view_allowed = true;
+                break;
+            }
         }
+        if (!is_view_allowed) info.quality = 0.0f;
     };
-
-    std::for_each(
-                infos->begin(),
-                infos->end(),
-                selected_views_only);
 }
 
 
@@ -349,16 +345,14 @@ postprocess_face_infos(
 
         std::vector<FaceProjectionInfo> & infos = face_projection_infos->at(i);
         if (settings.outlier_removal != OUTLIER_REMOVAL_NONE) {
-            segmentation_outlier_detection(segmentation[i], views_per_segment, &infos);
-            infos.erase(std::remove_if(infos.begin(), infos.end(),
-                [](FaceProjectionInfo const & info) -> bool {return info.quality == 0.0f;}),
-                infos.end());
 
             photometric_outlier_detection(&infos, settings);
+            segmentation_outlier_detection(segmentation[i], views_per_segment, &infos);
 
             infos.erase(std::remove_if(infos.begin(), infos.end(),
                 [](FaceProjectionInfo const & info) -> bool {return info.quality == 0.0f;}),
                 infos.end());
+
         }
         std::sort(infos.begin(), infos.end());
 

@@ -67,14 +67,20 @@ view_selection(DataCosts const & data_costs, UniGraph * graph, Segmentation cons
             }
         }
 
-        std::cout << "Segment " << segment_id << ":" << faces_of_segments[segment_id].size() << " faces\n";
-        // only allow views there all faces are visible
+        std::stringstream voller_durchblick_views;
+        // only allow views where all faces are visible
         for (size_t i = 0; i < summed_costs.size(); ++i) {
-            std::cout << "   view " << i << ":" << summed_costs[i].first << " faces visible\n";
             if (summed_costs[i].first == faces_of_segments[segment_id].size()) {
-                std::pair<size_t, cost_t> label_cost_pair(i, std::move(summed_costs[i].second));
+                std::pair<size_t, cost_t> label_cost_pair(i, summed_costs[i].second);
                 segment_costs[node_id].push_back(label_cost_pair);
+                voller_durchblick_views << i;
             }
+        }
+        if (voller_durchblick_views.str().empty()) {
+            std::cout << "segment " << segment_id << " is not completely seen by any allowed view\n";
+        }
+        else {
+            std::cout << "segment " << segment_id << " is completely visible in allowed views "  << voller_durchblick_views.str() << std::endl;
         }
     }
 
