@@ -161,8 +161,14 @@ get_jet_color(float value) {
 }
 
 inline void
-read_views_per_segment_file(std::string const & filename, tex::ViewsPerSegment * views_per_segment)
+read_views_per_segment_file(std::string const & filename, tex::TextureViews const & texture_views, tex::ViewsPerSegment * views_per_segment)
 {
+    // generate image_name->view_id mapping
+    std::map<std::string, std::uint16_t> view_id_of_image;
+    for (size_t i = 0; i < texture_views.size(); ++i)
+    {
+        view_id_of_image[texture_views.at(i).get_image_id()] = i;
+    }
 
     std::ifstream in(filename);
     if (!in.good())
@@ -178,16 +184,27 @@ read_views_per_segment_file(std::string const & filename, tex::ViewsPerSegment *
         int num_views;
         in >> num_views;
 
-        std::vector<std::uint16_t> views(num_views);
-        for(int j = 0; j < num_views; ++j) in >> views[j];
+        std::vector<std::uint16_t> views;
+        for(int j = 0; j < num_views; ++j)
+        {
+            std::string image_id;
+            in >> image_id;
+            auto view_it = view_id_of_image.find(image_id);
+            if (view_it != view_id_of_image.end()) views.push_back(view_it->second);
+            else {
+                std::stringstream strstr;
+                strstr << "while reading '" << filename << "': Image '" << image_id << "' of segment " << segment
+                       << " not referenced in scene definition.";
+                std::cerr << "WARNING: " + strstr.str() + "\n";
+            }
+        }
 
         tex::ViewsPerSegment::iterator found_it;
         if ((found_it = views_per_segment->find(segment)) != views_per_segment->end()) {
             std::stringstream strstr;
-            strstr << "WARN: segment " << segment << "already mentioned in " << filename
-                   << " (with " << found_it->second.size() << "views)."
-                   << "additional mention (with " << num_views << "views gnored." << std::endl;
-            continue;
+            strstr << "while reading '" << filename << "': Segment " << segment << "already mentioned in " << filename
+                   << " (with " << found_it->second.size() << "views).";
+            throw util::Exception(strstr.str());
         }
         views_per_segment->emplace(segment, std::move(views));
     }

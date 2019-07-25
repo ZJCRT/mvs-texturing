@@ -61,7 +61,7 @@ public:
     std::uint16_t get_num_segments() const { return num_segments; }
 };
 
-/** a list of view_id represent the allowed views per segment.
+/** a list of view_id representing the allowed views per segment.
  *  unlisted segments are not restricted. */
 using ViewsPerSegment = std::map< std::uint16_t, std::vector<std::uint16_t> >;
 

@@ -59,7 +59,7 @@ from_mve_scene(std::string const & scene_dir, std::string const & image_name,
 
         texture_views->push_back(
             TextureView(view->get_id(), view->get_camera(), util::fs::abspath(
-            util::fs::join_path(view->get_directory(), image_proxy->filename)), ""));
+            util::fs::join_path(view->get_directory(), image_proxy->filename)), "", image_name));
         view_counter.inc();
     }
 }
@@ -169,7 +169,7 @@ from_images_and_camera_files(std::string const & path,
         }
 
         #pragma omp critical
-        texture_views->push_back(TextureView(i / 2, cam_info, image_file,""));
+        texture_views->push_back(TextureView(i / 2, cam_info, image_file, "", util::fs::basename(img_file)));
 
         view_counter.inc();
     }
@@ -199,6 +199,8 @@ from_nvm_scene(std::string const & nvm_file,
         image = mve::image::image_undistort_vsfm<uint8_t>
             (image, mve_cam.flen, nvm_cam.radial_distortion);
 
+        std::string image_id = util::fs::basename(nvm_cam.filename);
+
         const std::string image_file = util::fs::join_path(
             tmp_dir,
             util::fs::replace_extension(util::fs::basename(nvm_cam.filename), "png" )
@@ -221,7 +223,7 @@ from_nvm_scene(std::string const & nvm_file,
         }
 
         #pragma omp critical
-        texture_views->push_back(TextureView(i, mve_cam, image_file,image_segmentation_file));
+        texture_views->push_back(TextureView(i, mve_cam, image_file, image_segmentation_file, image_id));
 
         view_counter.inc();
     }
