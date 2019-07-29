@@ -19,8 +19,8 @@
 
 TEX_NAMESPACE_BEGIN
 
-#define MAX_HOLE_NUM_FACES 100
-#define MAX_HOLE_PATCH_SIZE 100
+#define MAX_HOLE_NUM_FACES 900
+#define MAX_HOLE_PATCH_SIZE 300
 
 template <typename T>
 T clamp_nan_low(T const & v, T const & lo, T const & hi) {

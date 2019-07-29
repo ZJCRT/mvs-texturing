@@ -18,8 +18,10 @@
 TEX_NAMESPACE_BEGIN
 
 TextureView::TextureView(std::size_t id, mve::CameraInfo const & camera,
-    std::string const & image_file, std::string const & image_segmentation_file)
-    : id(id), image_file(image_file), image_segmentation_file(image_segmentation_file) {
+    std::string const & image_file, std::string const & image_segmentation_file,
+    std::string const &image_id)
+    : id(id), image_file(image_file), image_segmentation_file(image_segmentation_file),
+      image_id(image_id) {
 
     mve::image::ImageHeaders header;
     try {

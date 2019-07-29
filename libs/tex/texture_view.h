@@ -48,6 +48,7 @@ class TextureView {
         int height;
         std::string image_file;
         std::string image_segmentation_file;
+        std::string image_id;
         mve::ByteImage::Ptr image;
         mve::ByteImage::Ptr image_segmentation;
         mve::ByteImage::Ptr gradient_magnitude;
@@ -57,6 +58,9 @@ class TextureView {
     public:
         /** Returns the id of the TexureView which is consistent for every run. */
         std::size_t get_id(void) const;
+
+        /** Returns the original image_name of the TexureView  */
+        std::string const & get_image_id(void) const;
 
         /** Returns the 2D pixel coordinates of the given vertex projected into the view. */
         math::Vec2f get_pixel_coords(math::Vec3f const & vertex) const;
@@ -76,7 +80,7 @@ class TextureView {
         math::Vec3f get_pixel_values(math::Vec2f const & pixel) const;
 
         /** Constructs a TextureView from the give mve::CameraInfo containing the given image. */
-        TextureView(std::size_t id, mve::CameraInfo const & camera, std::string const & image_file, std::string const & image_segmentation_file);
+        TextureView(std::size_t id, mve::CameraInfo const & camera, std::string const & image_file, std::string const & image_segmentation_file, std::string const &image_id);
 
         /** Returns the position. */
         math::Vec3f get_pos(void) const;
@@ -127,6 +131,12 @@ inline std::size_t
 TextureView::get_id(void) const {
     return id;
 }
+
+inline std::string const &
+TextureView::get_image_id(void) const {
+    return image_id;
+}
+
 
 inline math::Vec3f
 TextureView::get_pos(void) const {
