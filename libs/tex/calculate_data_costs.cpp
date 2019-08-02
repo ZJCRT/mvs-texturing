@@ -138,9 +138,9 @@ photometric_outlier_detection(std::vector<FaceProjectionInfo> * infos, Settings 
  */
 void
 segmentation_outlier_detection(std::uint16_t const & majority_segment, ViewsPerSegment const & views_per_segment,
-                               std::vector<FaceProjectionInfo> * infos) {
+                               std::vector<FaceProjectionInfo> * view_infos) {
 
-    if (infos->size() == 0) return;
+    if (view_infos->size() == 0) return;
 
 //    auto reject_minority_segments = [majority_segment](FaceProjectionInfo & info) {
 //        if (info.segment_id != majority_segment) info.quality = 0.0f;
@@ -150,15 +150,15 @@ segmentation_outlier_detection(std::uint16_t const & majority_segment, ViewsPerS
     if (views_it == views_per_segment.end()) return;
 
     const auto & allowed_view_ids = views_it->second;
-    for( auto & info : (*infos)) {
+    for( auto & view_info : (*view_infos)) {
         bool is_view_allowed = false;
         for (auto allowed_view_id : allowed_view_ids) {
-            if (info.view_id == allowed_view_id)  {
+            if (view_info.view_id == allowed_view_id)  {
                 is_view_allowed = true;
                 break;
             }
         }
-        if (!is_view_allowed) info.quality = 0.0f;
+        if (!is_view_allowed) view_info.quality = 0.0f;
     };
 }
 
@@ -346,20 +346,24 @@ postprocess_face_infos(
         std::vector<FaceProjectionInfo> & infos = face_projection_infos->at(i);
         if (settings.outlier_removal != OUTLIER_REMOVAL_NONE) {
 
-            photometric_outlier_detection(&infos, settings);
             segmentation_outlier_detection(segmentation[i], views_per_segment, &infos);
-
+            // clear immediately, so that photometric only works on remaining views
+            // thus not removing our possible last man standing view.
             infos.erase(std::remove_if(infos.begin(), infos.end(),
                 [](FaceProjectionInfo const & info) -> bool {return info.quality == 0.0f;}),
                 infos.end());
 
+            photometric_outlier_detection(&infos, settings);
+            infos.erase(std::remove_if(infos.begin(), infos.end(),
+                [](FaceProjectionInfo const & info) -> bool {return info.quality == 0.0f;}),
+                infos.end());
         }
         std::sort(infos.begin(), infos.end());
 
         face_counter.inc();
     }
 
-    /* Determine the function for the normlization. */
+    /* Determine the function for the normalization. */
     float max_quality = 0.0f;
     for (std::size_t i = 0; i < face_projection_infos->size(); ++i)
         for (FaceProjectionInfo const & info : face_projection_infos->at(i))

@@ -15,6 +15,18 @@
 
 TEX_NAMESPACE_BEGIN
 
+const double NOT_VISIBLE_COST_FACTOR = 1.5;
+
+bool
+is_visible(int label, const DataCosts::Column & cost_column) {
+
+    if (label == 0) return false;
+    for(const auto & label_cost_pair : cost_column) {
+        if (label_cost_pair.first == label - 1) return true;
+    }
+    return false;
+}
+
 void
 view_selection(DataCosts const & data_costs, UniGraph * graph, Segmentation const & segmentation, Settings const &) {
     using uint_t = unsigned int;
@@ -55,32 +67,40 @@ view_selection(DataCosts const & data_costs, UniGraph * graph, Segmentation cons
     for (size_t segment_id = 1; segment_id < num_segments; ++segment_id)
     {
         auto node_id = segment_id - 1;
-        std::map<std::uint16_t, std::pair<size_t, cost_t > > summed_costs;
+        // view_statistics = mapping of view_id -> (num_visible_faces, summed_costs)
+        std::map<std::uint16_t, std::pair<size_t, cost_t > > view_statistics;
         for(auto face : faces_of_segments[segment_id]) {
             DataCosts::Column const & data_costs_for_node = data_costs.col(face);
 
             for(std::size_t j = 0; j < data_costs_for_node.size(); ++j) {
                 auto & label_cost_pair = data_costs_for_node[j];
-                auto & summed_cost = summed_costs[label_cost_pair.first];
-                summed_cost.first += 1;
-                summed_cost.second += label_cost_pair.second;
+                auto & statistics = view_statistics[label_cost_pair.first];
+                statistics.first += 1;
+                statistics.second += label_cost_pair.second;
             }
         }
 
-        std::stringstream voller_durchblick_views;
+        size_t num_faces_in_segment = faces_of_segments[segment_id].size();
+        std::stringstream view_info_string;
         // only allow views where all faces are visible
-        for (size_t i = 0; i < summed_costs.size(); ++i) {
-            if (summed_costs[i].first == faces_of_segments[segment_id].size()) {
-                std::pair<size_t, cost_t> label_cost_pair(i, summed_costs[i].second);
-                segment_costs[node_id].push_back(label_cost_pair);
-                voller_durchblick_views << i;
-            }
+        for (auto & view_statistic : view_statistics) {
+            std::uint16_t view_id = view_statistic.first;
+            size_t num_visible_faces = view_statistic.second.first;
+            size_t summed_cost = view_statistic.second.second;
+
+            std::pair<size_t, cost_t> label_cost_pair(view_id, summed_cost);
+            // face with missing views increases the costs. 1 is the maximal cost a normal face could have (ssee calculate_costs)
+            // todo: better would be an area based penalty.
+            label_cost_pair.second += NOT_VISIBLE_COST_FACTOR * (num_faces_in_segment - num_visible_faces);
+            segment_costs[node_id].push_back(label_cost_pair);
+            view_info_string << view_id << "(" << num_visible_faces << "," << summed_cost << "->" << label_cost_pair.second << ")\n";
         }
-        if (voller_durchblick_views.str().empty()) {
+
+        if (view_info_string.str().empty()) {
             std::cout << "segment " << segment_id << " is not completely seen by any allowed view\n";
         }
         else {
-            std::cout << "segment " << segment_id << " is completely visible in allowed views "  << voller_durchblick_views.str() << std::endl;
+            std::cout << "segment " << segment_id << " is visible in allowed views(num_faces, data_cost->costs_adjusted):\n" << view_info_string.str() << std::endl;
         }
     }
 
@@ -225,6 +245,10 @@ view_selection(DataCosts const & data_costs, UniGraph * graph, Segmentation cons
     std::cout << "\tOptimizing:\n\t\tTime[s]\tEnergy" << std::endl;
     solver.optimize(solution, ctr);
 
+
+    for (std::size_t i = 0; i < num_segments - 1; ++i) {
+        std::cout << "segment " << (i+1) << ": solution " << solution[i] << ", label " << label_set.label_from_offset(i, solution[i]) << "\n";
+    }
     /* Label 0 is undefined. */
     std::size_t num_labels = data_costs.rows() + 1;
     std::size_t undefined = 0;
@@ -235,6 +259,7 @@ view_selection(DataCosts const & data_costs, UniGraph * graph, Segmentation cons
         if (label < 0 || num_labels <= static_cast<std::size_t>(label)) {
             throw std::runtime_error("Incorrect labeling");
         }
+        if (!is_visible(label, data_costs.col(i))) label = 0;
         if (label == 0) undefined += 1;
         graph->set_label(i, static_cast<std::size_t>(label));
     }
