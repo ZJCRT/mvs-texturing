@@ -137,6 +137,143 @@ generate_candidate(int label, TextureView const & texture_view,
     return texture_patch_candidate;
 }
 
+
+std::vector<math::Vec2f> get_pca_projection(mve::TriangleMesh::VertexList const & vertices, const std::vector<std::size_t> & hole_vertices, int * image_size_ptr) {
+    // pca for the (very) poor:
+    //  * only the direction x, y, z, x+-y, x+-z, y+-z, and x+-y+-z are considered
+    //  * not the wieght but the maximal points determined the principal components.
+
+    // calculate extent in different directions
+    const double sqrtHalf = sqrt(0.5);
+    const double sqrtThird = sqrt(1/3.0);
+    const int num_dirs = 13;
+    Eigen::Matrix<float, num_dirs, 3> directions;
+    directions <<
+        1, 0, 0,
+        0, 1, 0,
+        0, 0, 1,
+        sqrtHalf, sqrtHalf, 0,
+        sqrtHalf, -sqrtHalf, 0,
+        sqrtHalf, 0, sqrtHalf,
+        sqrtHalf, 0, -sqrtHalf,
+        0, sqrtHalf, sqrtHalf,
+        0, sqrtHalf, -sqrtHalf,
+        sqrtThird, sqrtThird, sqrtThird,
+        sqrtThird, sqrtThird, -sqrtThird,
+        sqrtThird, -sqrtThird, sqrtThird,
+        sqrtThird, -sqrtThird, -sqrtThird;
+
+    math::Vec3f const & v0 = vertices[hole_vertices[0]];
+    Eigen::Vector3f v;
+    v << v0[0], v0[1], v0[2];
+    Eigen::VectorXf mins = directions * v;
+    Eigen::VectorXf maxs = directions * v;
+    for (auto idx : hole_vertices) {
+        math::Vec3f const & v0 = vertices[idx];
+        Eigen::Vector3f v;
+        v << v0[0], v0[1], v0[2];
+        Eigen::VectorXf projections = directions * v;
+        for( int i = 0; i < num_dirs; ++i) {
+            mins[i] = std::min(mins[i], projections[i]);
+            maxs[i] = std::max(maxs[i], projections[i]);
+        }
+    }
+
+    // determine 2 perpendicular directions with biggest extent
+    Eigen::VectorXf diffs = maxs - mins;
+    int max_dir = 0;
+    diffs.maxCoeff(&max_dir);
+
+    Eigen::Array<float, num_dirs, 1> scalar_with_max = (directions * directions.row(max_dir).transpose()).array();
+    Eigen::Array<float, num_dirs, 1> is_perpendicular =
+            -Eigen::floor(Eigen::abs(scalar_with_max)-std::numeric_limits<float>::epsilon()*100);
+    int max_dir2 = 1;
+    (diffs.array() * is_perpendicular).maxCoeff(&max_dir2);
+
+    const size_t num_vertices = hole_vertices.size();
+
+    // project vertices into plane using those directions
+    std::vector<math::Vec2f> projections(num_vertices);
+    double const max_hole_patch_size = MAX_HOLE_PATCH_SIZE;
+    int &image_size = *image_size_ptr;
+    image_size = std::min(sqrt(num_vertices)*5, max_hole_patch_size);
+    image_size += 2 * (1 + texture_patch_border);
+    int scale = image_size - 2*texture_patch_border;
+    for (std::size_t j = 0; j < num_vertices; ++j) {
+        math::Vec3f const & v0 = vertices[hole_vertices[j]];
+        Eigen::Vector3f v;
+        v << v0[0], v0[1], v0[2];
+        projections[j] = math::Vec2f(
+                    (v.dot(directions.row(max_dir)) - mins[max_dir]) / diffs[max_dir],
+                    (v.dot(directions.row(max_dir2)) - mins[max_dir2]) / diffs[max_dir2])
+                     * scale + texture_patch_border;
+    }
+
+    return projections;
+}
+
+void write_texture_coords(std::vector<std::size_t> const & hole,
+                        UniGraph const & graph,
+                        mve::TriangleMesh::FaceList const & mesh_faces,
+                        mve::MeshInfo const & mesh_info,
+                        std::vector<math::Vec2f> const & projections,
+                        size_t image_size,
+                        std::map<std::size_t, std::size_t> const & g2l,
+                        std::vector<std::size_t> const & l2g,
+                        std::vector<std::vector<VertexProjectionInfo> > * vertex_projection_infos,
+                        std::vector<TexturePatch::Ptr> * texture_patches) {
+
+    const size_t num_vertices = l2g.size();
+    std::vector<math::Vec2f> texcoords; texcoords.reserve(hole.size());
+    for (std::size_t const face_id : hole) {
+        for (std::size_t j = 0; j < 3; ++j) {
+            std::size_t const vertex_id = mesh_faces[face_id * 3 + j];
+            math::Vec2f const & projection = projections[g2l.at(vertex_id)];
+            texcoords.push_back(projection);
+        }
+    }
+    mve::FloatImage::Ptr image = mve::FloatImage::create(image_size, image_size, 3);
+    //DEBUG image->fill_color(*math::Vec4uc(0, 255, 0, 255));
+    TexturePatch::Ptr texture_patch = TexturePatch::create(0, hole, texcoords, image);
+    std::size_t texture_patch_id;
+    #pragma omp critical
+    {
+        texture_patches->push_back(texture_patch);
+        texture_patch_id = texture_patches->size() - 1;
+    }
+
+    for (std::size_t j = 0; j < num_vertices; ++j) {
+        std::size_t const vertex_id = l2g[j];
+        std::vector<std::size_t> const & adj_faces = mesh_info[vertex_id].faces;
+        std::vector<std::size_t> faces; faces.reserve(adj_faces.size());
+        for (std::size_t adj_face : adj_faces) {
+            if (graph.get_label(adj_face) == 0) {
+                faces.push_back(adj_face);
+            }
+        }
+        VertexProjectionInfo info = {texture_patch_id, projections[j], faces};
+        #pragma omp critical (vpis)
+        vertex_projection_infos->at(vertex_id).push_back(info);
+    }
+
+}
+
+void pca_project_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
+            mve::TriangleMesh::ConstPtr mesh, mve::MeshInfo const & mesh_info,
+            std::map<std::size_t, std::size_t> const & g2l,
+            std::vector<std::size_t> const & l2g,
+            std::vector<std::vector<VertexProjectionInfo> > * vertex_projection_infos,
+            std::vector<TexturePatch::Ptr> * texture_patches) {
+
+    int image_size;
+    std::vector<math::Vec2f> projections = get_pca_projection(mesh->get_vertices(), l2g, &image_size);
+    write_texture_coords(hole, graph, mesh->get_faces(), mesh_info,
+                         projections, image_size, g2l, l2g,
+                         vertex_projection_infos, texture_patches);
+}
+
+
+
 bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
     mve::TriangleMesh::ConstPtr mesh, mve::MeshInfo const & mesh_info,
     std::vector<std::vector<VertexProjectionInfo> > * vertex_projection_infos,
@@ -189,7 +326,7 @@ bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
         if (mesh_info[vertex_id].vclass != mve::MeshInfo::VERTEX_CLASS_SIMPLE) {
             /* Complex/Border vertex in original mesh */
             disk_topology = false;
-            break;
+            continue;
         }
 
         /* Check new topology and determine if vertex is now at the border. */
@@ -233,7 +370,7 @@ bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
         if (gaps > 1) {
             /* Complex vertex in hole */
             disk_topology = false;
-            break;
+            continue;
         }
 
         if (is_border[j]) {
@@ -246,7 +383,11 @@ bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
     tmp.clear();
 
     /* No disk or genus zero topology */
-    if (!disk_topology || num_border_vertices == 0) return false;
+    if (num_border_vertices == 0) return false;
+    if (!disk_topology) {
+        pca_project_hole(hole, graph, mesh, mesh_info, g2l, l2g, vertex_projection_infos, texture_patches);
+        return true;
+    }
 
     std::vector<std::size_t> border; border.reserve(num_border_vertices);
     std::size_t prev = seed;
@@ -275,7 +416,10 @@ bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
         if (border.size() > num_border_vertices) break;
     }
 
-    if (border.size() != num_border_vertices) return false;
+    if (border.size() != num_border_vertices) {
+        pca_project_hole(hole, graph, mesh, mesh_info, g2l, l2g, vertex_projection_infos, texture_patches);
+        return true;
+    }
 
     float total_length = 0.0f;
     float total_projection_length = 0.0f;
@@ -312,7 +456,10 @@ bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
     }
     float radius = total_projection_length / (2.0f * MATH_PI);
 
-    if (total_length < std::numeric_limits<float>::epsilon()) return false;
+    if (total_length < std::numeric_limits<float>::epsilon()) {
+        pca_project_hole(hole, graph, mesh, mesh_info, g2l, l2g, vertex_projection_infos, texture_patches);
+        return true;
+    }
 
     std::vector<math::Vec2f> projections(num_vertices);
     {
@@ -357,7 +504,10 @@ bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
                 float v02n = v02.norm();
 
                 /* Ensure numerical stability */
-                if (v01n * v02n < std::numeric_limits<float>::epsilon()) return false;
+                if (v01n * v02n < std::numeric_limits<float>::epsilon()) {
+                    pca_project_hole(hole, graph, mesh, mesh_info, g2l, l2g, vertex_projection_infos, texture_patches);
+                    return true;
+                }
 
                 float calpha = v01.dot(v02) / (v01n * v02n);
                 float alpha = std::acos(clamp(calpha, -1.0f, 1.0f));
@@ -369,7 +519,10 @@ bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
             float sum = 0.0f;
             for (it = weights.begin(); it != weights.end(); ++it)
                 sum += it->second;
-            if (sum < std::numeric_limits<float>::epsilon()) return false;
+            if (sum < std::numeric_limits<float>::epsilon()) {
+                pca_project_hole(hole, graph, mesh, mesh_info, g2l, l2g, vertex_projection_infos, texture_patches);
+                return true;
+            }
             for (it = weights.begin(); it != weights.end(); ++it)
                 it->second /= sum;
 
@@ -377,8 +530,7 @@ bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
             by[idx[j]] = 0.0f;
             for (it = weights.begin(); it != weights.end(); ++it) {
                 if (is_border[it->first]) {
-                    std::size_t border_vertex_id = border[idx[it->first]];
-                    math::Vec2f projection = projections[g2l[border_vertex_id]];
+                    math::Vec2f projection = projections[it->first];
                     bx[idx[j]] += projection[0] * it->second;
                     by[idx[j]] += projection[1] * it->second;
                 } else {
@@ -416,38 +568,9 @@ bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
         }
     }
 
-    std::vector<math::Vec2f> texcoords; texcoords.reserve(hole.size());
-    for (std::size_t const face_id : hole) {
-        for (std::size_t j = 0; j < 3; ++j) {
-            std::size_t const vertex_id = mesh_faces[face_id * 3 + j];
-            math::Vec2f const & projection = projections[g2l[vertex_id]];
-            texcoords.push_back(projection);
-        }
-    }
-    mve::FloatImage::Ptr image = mve::FloatImage::create(image_size, image_size, 3);
-    //DEBUG image->fill_color(*math::Vec4uc(0, 255, 0, 255));
-    TexturePatch::Ptr texture_patch = TexturePatch::create(0, hole, texcoords, image);
-    std::size_t texture_patch_id;
-    #pragma omp critical
-    {
-        texture_patches->push_back(texture_patch);
-        texture_patch_id = texture_patches->size() - 1;
-    }
-
-    for (std::size_t j = 0; j < num_vertices; ++j) {
-        std::size_t const vertex_id = l2g[j];
-        std::vector<std::size_t> const & adj_faces = mesh_info[vertex_id].faces;
-        std::vector<std::size_t> faces; faces.reserve(adj_faces.size());
-        for (std::size_t adj_face : adj_faces) {
-            if (graph.get_label(adj_face) == 0) {
-                faces.push_back(adj_face);
-            }
-        }
-        VertexProjectionInfo info = {texture_patch_id, projections[j], faces};
-        #pragma omp critical (vpis)
-        vertex_projection_infos->at(vertex_id).push_back(info);
-    }
-
+    write_texture_coords(hole, graph, mesh_faces, mesh_info,
+                         projections, image_size, g2l, l2g,
+                         vertex_projection_infos, texture_patches);
     return true;
 }
 
