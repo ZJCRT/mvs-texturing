@@ -138,8 +138,10 @@ generate_candidate(int label, TextureView const & texture_view,
 }
 
 
-std::vector<math::Vec2f> best_projection(mve::TriangleMesh::VertexList const & vertices, const std::vector<std::size_t> & hole_vertices, int * image_size_ptr) {
+std::vector<math::Vec2f> get_pca_projection(mve::TriangleMesh::VertexList const & vertices, const std::vector<std::size_t> & hole_vertices, int * image_size_ptr) {
     // pca for the (very) poor:
+    //  * only the direction x, y, z, x+-y, x+-z, y+-z, and x+-y+-z are considered
+    //  * not the wieght but the maximal points determined the principal components.
 
     // calculate extent in different directions
     const double sqrtHalf = sqrt(0.5);
@@ -210,26 +212,18 @@ std::vector<math::Vec2f> best_projection(mve::TriangleMesh::VertexList const & v
     return projections;
 }
 
-void doHack(std::vector<std::size_t> const & hole, UniGraph const & graph,
-            mve::TriangleMesh::ConstPtr mesh, mve::MeshInfo const & mesh_info,
-            std::vector<std::vector<VertexProjectionInfo> > * vertex_projection_infos,
-            std::vector<TexturePatch::Ptr> * texture_patches, const size_t num_vertices,
-            const std::map<std::size_t, std::size_t> & g2l,
-            const std::vector<std::size_t> & l2g) {
+void write_texture_coords(std::vector<std::size_t> const & hole,
+                        UniGraph const & graph,
+                        mve::TriangleMesh::FaceList const & mesh_faces,
+                        mve::MeshInfo const & mesh_info,
+                        std::vector<math::Vec2f> const & projections,
+                        size_t image_size,
+                        std::map<std::size_t, std::size_t> const & g2l,
+                        std::vector<std::size_t> const & l2g,
+                        std::vector<std::vector<VertexProjectionInfo> > * vertex_projection_infos,
+                        std::vector<TexturePatch::Ptr> * texture_patches) {
 
-    mve::TriangleMesh::FaceList const & mesh_faces = mesh->get_faces();
-
-    int image_size;
-    std::vector<math::Vec2f> projections = best_projection(mesh->get_vertices(), l2g, &image_size);
-//    double const max_hole_patch_size = MAX_HOLE_PATCH_SIZE;
-//    int image_size = std::min(sqrt(num_vertices)*3, max_hole_patch_size);
-//    /* Ensure a minimum scale of one */
-//    image_size += 2 * (1 + texture_patch_border);
-//    int scale = image_size - 2*texture_patch_border;
-//    for (std::size_t j = 0; j < num_vertices; ++j) {
-//        projections[j] = math::Vec2f(float(rand())/float(RAND_MAX), float(rand())/float(RAND_MAX)) * scale + texture_patch_border;
-//    }
-
+    const size_t num_vertices = l2g.size();
     std::vector<math::Vec2f> texcoords; texcoords.reserve(hole.size());
     for (std::size_t const face_id : hole) {
         for (std::size_t j = 0; j < 3; ++j) {
@@ -261,7 +255,24 @@ void doHack(std::vector<std::size_t> const & hole, UniGraph const & graph,
         #pragma omp critical (vpis)
         vertex_projection_infos->at(vertex_id).push_back(info);
     }
+
 }
+
+void pca_project_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
+            mve::TriangleMesh::ConstPtr mesh, mve::MeshInfo const & mesh_info,
+            std::map<std::size_t, std::size_t> const & g2l,
+            std::vector<std::size_t> const & l2g,
+            std::vector<std::vector<VertexProjectionInfo> > * vertex_projection_infos,
+            std::vector<TexturePatch::Ptr> * texture_patches) {
+
+    int image_size;
+    std::vector<math::Vec2f> projections = get_pca_projection(mesh->get_vertices(), l2g, &image_size);
+    write_texture_coords(hole, graph, mesh->get_faces(), mesh_info,
+                         projections, image_size, g2l, l2g,
+                         vertex_projection_infos, texture_patches);
+}
+
+
 
 bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
     mve::TriangleMesh::ConstPtr mesh, mve::MeshInfo const & mesh_info,
@@ -374,7 +385,7 @@ bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
     /* No disk or genus zero topology */
     if (num_border_vertices == 0) return false;
     if (!disk_topology) {
-        doHack(hole, graph, mesh, mesh_info, vertex_projection_infos, texture_patches, num_vertices, g2l, l2g);
+        pca_project_hole(hole, graph, mesh, mesh_info, g2l, l2g, vertex_projection_infos, texture_patches);
         return true;
     }
 
@@ -406,7 +417,7 @@ bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
     }
 
     if (border.size() != num_border_vertices) {
-        doHack(hole, graph, mesh, mesh_info, vertex_projection_infos, texture_patches, num_vertices, g2l, l2g);
+        pca_project_hole(hole, graph, mesh, mesh_info, g2l, l2g, vertex_projection_infos, texture_patches);
         return true;
     }
 
@@ -446,7 +457,7 @@ bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
     float radius = total_projection_length / (2.0f * MATH_PI);
 
     if (total_length < std::numeric_limits<float>::epsilon()) {
-        doHack(hole, graph, mesh, mesh_info, vertex_projection_infos, texture_patches, num_vertices, g2l, l2g);
+        pca_project_hole(hole, graph, mesh, mesh_info, g2l, l2g, vertex_projection_infos, texture_patches);
         return true;
     }
 
@@ -494,7 +505,7 @@ bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
 
                 /* Ensure numerical stability */
                 if (v01n * v02n < std::numeric_limits<float>::epsilon()) {
-                    doHack(hole, graph, mesh, mesh_info, vertex_projection_infos, texture_patches, num_vertices, g2l, l2g);
+                    pca_project_hole(hole, graph, mesh, mesh_info, g2l, l2g, vertex_projection_infos, texture_patches);
                     return true;
                 }
 
@@ -509,7 +520,7 @@ bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
             for (it = weights.begin(); it != weights.end(); ++it)
                 sum += it->second;
             if (sum < std::numeric_limits<float>::epsilon()) {
-                doHack(hole, graph, mesh, mesh_info, vertex_projection_infos, texture_patches, num_vertices, g2l, l2g);
+                pca_project_hole(hole, graph, mesh, mesh_info, g2l, l2g, vertex_projection_infos, texture_patches);
                 return true;
             }
             for (it = weights.begin(); it != weights.end(); ++it)
@@ -557,38 +568,9 @@ bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
         }
     }
 
-    std::vector<math::Vec2f> texcoords; texcoords.reserve(hole.size());
-    for (std::size_t const face_id : hole) {
-        for (std::size_t j = 0; j < 3; ++j) {
-            std::size_t const vertex_id = mesh_faces[face_id * 3 + j];
-            math::Vec2f const & projection = projections[g2l[vertex_id]];
-            texcoords.push_back(projection);
-        }
-    }
-    mve::FloatImage::Ptr image = mve::FloatImage::create(image_size, image_size, 3);
-    //DEBUG image->fill_color(*math::Vec4uc(0, 255, 0, 255));
-    TexturePatch::Ptr texture_patch = TexturePatch::create(0, hole, texcoords, image);
-    std::size_t texture_patch_id;
-    #pragma omp critical
-    {
-        texture_patches->push_back(texture_patch);
-        texture_patch_id = texture_patches->size() - 1;
-    }
-
-    for (std::size_t j = 0; j < num_vertices; ++j) {
-        std::size_t const vertex_id = l2g[j];
-        std::vector<std::size_t> const & adj_faces = mesh_info[vertex_id].faces;
-        std::vector<std::size_t> faces; faces.reserve(adj_faces.size());
-        for (std::size_t adj_face : adj_faces) {
-            if (graph.get_label(adj_face) == 0) {
-                faces.push_back(adj_face);
-            }
-        }
-        VertexProjectionInfo info = {texture_patch_id, projections[j], faces};
-        #pragma omp critical (vpis)
-        vertex_projection_infos->at(vertex_id).push_back(info);
-    }
-
+    write_texture_coords(hole, graph, mesh_faces, mesh_info,
+                         projections, image_size, g2l, l2g,
+                         vertex_projection_infos, texture_patches);
     return true;
 }
 
