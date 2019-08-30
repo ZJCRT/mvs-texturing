@@ -140,8 +140,12 @@ generate_candidate(int label, TextureView const & texture_view,
 
 std::vector<math::Vec2f> best_projection(mve::TriangleMesh::VertexList const & vertices, const std::vector<std::size_t> & hole_vertices, int * image_size_ptr) {
     // pca for the (very) poor:
-    double sqrtHalf = sqrt(0.5);
-    Eigen::Matrix<float, 9, 3> directions;
+
+    // calculate extent in different directions
+    const double sqrtHalf = sqrt(0.5);
+    const double sqrtThird = sqrt(1/3.0);
+    const int num_dirs = 13;
+    Eigen::Matrix<float, num_dirs, 3> directions;
     directions <<
         1, 0, 0,
         0, 1, 0,
@@ -151,10 +155,11 @@ std::vector<math::Vec2f> best_projection(mve::TriangleMesh::VertexList const & v
         sqrtHalf, 0, sqrtHalf,
         sqrtHalf, 0, -sqrtHalf,
         0, sqrtHalf, sqrtHalf,
-        0, sqrtHalf, -sqrtHalf;
-
-    Eigen::Array<float, 9, 9> is_perpendicular;
-    is_perpendicular = (1-Eigen::abs((directions * directions.transpose()).array()));
+        0, sqrtHalf, -sqrtHalf,
+        sqrtThird, sqrtThird, sqrtThird,
+        sqrtThird, sqrtThird, -sqrtThird,
+        sqrtThird, -sqrtThird, sqrtThird,
+        sqrtThird, -sqrtThird, -sqrtThird;
 
     math::Vec3f const & v0 = vertices[hole_vertices[0]];
     Eigen::Vector3f v;
@@ -166,24 +171,30 @@ std::vector<math::Vec2f> best_projection(mve::TriangleMesh::VertexList const & v
         Eigen::Vector3f v;
         v << v0[0], v0[1], v0[2];
         Eigen::VectorXf projections = directions * v;
-        for( int i = 0; i < 9; ++i) {
+        for( int i = 0; i < num_dirs; ++i) {
             mins[i] = std::min(mins[i], projections[i]);
             maxs[i] = std::max(maxs[i], projections[i]);
         }
     }
 
+    // determine 2 perpendicular directions with biggest extent
     Eigen::VectorXf diffs = maxs - mins;
     int max_dir = 0;
-    int max_dir2 = 1;
     diffs.maxCoeff(&max_dir);
-    (diffs.array() * is_perpendicular.col(max_dir)).maxCoeff(&max_dir2);
+
+    Eigen::Array<float, num_dirs, 1> scalar_with_max = (directions * directions.row(max_dir).transpose()).array();
+    Eigen::Array<float, num_dirs, 1> is_perpendicular =
+            -Eigen::floor(Eigen::abs(scalar_with_max)-std::numeric_limits<float>::epsilon()*100);
+    int max_dir2 = 1;
+    (diffs.array() * is_perpendicular).maxCoeff(&max_dir2);
 
     const size_t num_vertices = hole_vertices.size();
 
+    // project vertices into plane using those directions
     std::vector<math::Vec2f> projections(num_vertices);
     double const max_hole_patch_size = MAX_HOLE_PATCH_SIZE;
     int &image_size = *image_size_ptr;
-    image_size = std::min(sqrt(num_vertices)*3, max_hole_patch_size);
+    image_size = std::min(sqrt(num_vertices)*5, max_hole_patch_size);
     image_size += 2 * (1 + texture_patch_border);
     int scale = image_size - 2*texture_patch_border;
     for (std::size_t j = 0; j < num_vertices; ++j) {
@@ -197,7 +208,6 @@ std::vector<math::Vec2f> best_projection(mve::TriangleMesh::VertexList const & v
     }
 
     return projections;
-
 }
 
 void doHack(std::vector<std::size_t> const & hole, UniGraph const & graph,
