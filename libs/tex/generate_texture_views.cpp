@@ -175,21 +175,18 @@ from_images_and_camera_files(std::string const & path,
     }
 }
 
-void
-from_nvm_scene(std::string const & nvm_file,
-    std::vector<TextureView> * texture_views, std::string const & tmp_dir, std::string const & segmentation_image_dir)
-{
-    std::vector<mve::NVMCameraInfo> nvm_cams;
-    mve::Bundle::Ptr bundle = mve::load_nvm_bundle(nvm_file, &nvm_cams);
-    mve::Bundle::Cameras& cameras = bundle->get_cameras();
 
+void
+from_nvm_cameras(mve::Bundle::Cameras & cameras, const std::vector<mve::NVMCameraInfo> &nvm_cams,
+                 std::vector<TextureView> * texture_views,
+                 std::string const & tmp_dir, std::string const & segmentation_image_dir)
+{
     ProgressCounter view_counter("\tLoading", cameras.size());
     #pragma omp parallel for
     for (std::size_t i = 0; i < cameras.size(); ++i) {
         view_counter.progress<SIMPLE>();
         mve::CameraInfo& mve_cam = cameras[i];
         mve::NVMCameraInfo const& nvm_cam = nvm_cams[i];
-
 
         mve::ByteImage::Ptr image = mve::image::load_file(nvm_cam.filename);
 
@@ -230,6 +227,24 @@ from_nvm_scene(std::string const & nvm_file,
 }
 
 void
+from_apollo_calibration(std::string const & calibration_file,
+    std::vector<TextureView> * texture_views, std::string const & tmp_dir, std::string const & segmentation_image_dir)
+{
+    std::vector<mve::NVMCameraInfo> nvm_cams;
+    mve::Bundle::Ptr bundle = mve::load_apollo_bundle(calibration_file, &nvm_cams);
+    from_nvm_cameras(bundle->get_cameras(), nvm_cams, texture_views, tmp_dir, segmentation_image_dir);
+}
+
+void
+from_nvm_scene(std::string const & nvm_file,
+    std::vector<TextureView> * texture_views, std::string const & tmp_dir, std::string const & segmentation_image_dir)
+{
+    std::vector<mve::NVMCameraInfo> nvm_cams;
+    mve::Bundle::Ptr bundle = mve::load_nvm_bundle(nvm_file, &nvm_cams);
+    from_nvm_cameras(bundle->get_cameras(), nvm_cams, texture_views, tmp_dir, segmentation_image_dir);
+}
+
+void
 generate_texture_views(std::string const & in_scene,
     std::vector<TextureView> * texture_views, std::string const & tmp_dir, std::string const & segmentation_image_dir)
 {
@@ -238,8 +253,9 @@ generate_texture_views(std::string const & in_scene,
     /* BUNDLEFILE */
     if (util::fs::file_exists(in_scene.c_str())) {
         std::string const & file = in_scene;
-        std::string extension = util::string::uppercase(util::string::right(file, 3));
-        if (extension == "NVM") {
+        if (util::string::uppercase(util::string::right(file, 5)) == ".JSON") {
+            from_apollo_calibration(file, texture_views, tmp_dir, segmentation_image_dir);
+        } else if (util::string::uppercase(util::string::right(file, 4)) == ".NVM") {
             from_nvm_scene(file, texture_views, tmp_dir, segmentation_image_dir);
         }
     }
