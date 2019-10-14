@@ -284,7 +284,7 @@ generate_texture_views(std::string const & in_scene,
         std::cerr
             << "No proper input scene descriptor given.\n"
             << "A input descriptor can be:\n"
-            << "BUNDLE_FILE - a bundle file (currently onle .nvm files are supported)\n"
+            << "BUNDLE_FILE - a bundle file (currently only .nvm and apollo13-calibration files are supported)\n"
             << "SCENE_FOLDER - a folder containing images and .cam files\n"
             << "MVE_SCENE::EMBEDDING - a mve scene and embedding\n"
             << std::endl;
