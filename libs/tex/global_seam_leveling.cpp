@@ -175,6 +175,10 @@ global_seam_leveling(UniGraph const & graph, mve::TriangleMesh::ConstPtr mesh,
     }
     std::size_t x_rows = x_row;
     assert(x_rows < static_cast<std::size_t>(std::numeric_limits<int>::max()));
+    if (x_rows == 0) {
+        std::cout << "no labeled face found. abort global seaming." << std::endl;
+        return;
+    }
 
     float const lambda = 0.1f;
 
