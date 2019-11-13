@@ -263,6 +263,9 @@ view_selection(DataCosts const & data_costs, UniGraph * graph, Segmentation cons
         if (label == 0) undefined += 1;
         graph->set_label(i, static_cast<std::size_t>(label));
     }
+    if (undefined > 1 && undefined == num_faces) {
+        throw std::runtime_error("None of the faces have been seen. Are they inverted?");
+    }
     std::cout << '\t' << undefined << " faces have not been seen" << std::endl;
 }
 
