@@ -212,8 +212,8 @@ std::vector<math::Vec2f> get_pca_projection(mve::TriangleMesh::VertexList const 
 
         // must(!) ensure that even rounding errors keep the coords within range.
         projections[j] = math::Vec2f(
-                    std::min(projections[j][0], static_cast<float>(image_size - 1)),
-                    std::min(projections[j][1], static_cast<float>(image_size - 1)));
+                    math::clamp(projections[j][0], static_cast<float>(texture_patch_border), static_cast<float>(image_size - texture_patch_border)),
+                    math::clamp(projections[j][1], static_cast<float>(texture_patch_border), static_cast<float>(image_size - texture_patch_border)));
     }
 
     return projections;
