@@ -199,14 +199,21 @@ std::vector<math::Vec2f> get_pca_projection(mve::TriangleMesh::VertexList const 
     image_size = std::min(sqrt(num_vertices)*5, max_hole_patch_size);
     image_size += 2 * (1 + texture_patch_border);
     int scale = image_size - 2*texture_patch_border;
+    const float x_scale = scale / diffs[max_dir];
+    const float y_scale = scale / diffs[max_dir2];
     for (std::size_t j = 0; j < num_vertices; ++j) {
         math::Vec3f const & v0 = vertices[hole_vertices[j]];
         Eigen::Vector3f v;
         v << v0[0], v0[1], v0[2];
         projections[j] = math::Vec2f(
-                    (v.dot(directions.row(max_dir)) - mins[max_dir]) / diffs[max_dir],
-                    (v.dot(directions.row(max_dir2)) - mins[max_dir2]) / diffs[max_dir2])
-                     * scale + texture_patch_border;
+                    (v.dot(directions.row(max_dir)) - mins[max_dir]) * x_scale,
+                    (v.dot(directions.row(max_dir2)) - mins[max_dir2]) * y_scale)
+                      + texture_patch_border;
+
+        // must(!) ensure that even rounding errors keep the coords within range.
+        projections[j] = math::Vec2f(
+                    std::min(projections[j][0], static_cast<float>(image_size - 1)),
+                    std::min(projections[j][1], static_cast<float>(image_size - 1)));
     }
 
     return projections;
