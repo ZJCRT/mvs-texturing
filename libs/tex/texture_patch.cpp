@@ -87,7 +87,7 @@ TexturePatch::adjust_colors(std::vector<math::Vec3f> const & adjust_values) {
                 // OGCAC: the baricentric coordinates are prone to rounding errors
                 //  --> check 0 as well.
                 bool inside = bcoords.minimum() >= 0.0f
-                    && x != get_width() - 1 && y != get_height() - 1;
+                    && x != get_width() - 1 && y != get_height() - 1
                     && x != 0 && y != 0;
                 if (inside) {
                     assert(x != 0 && y != 0);
