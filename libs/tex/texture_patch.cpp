@@ -67,7 +67,28 @@ TexturePatch::adjust_colors(std::vector<math::Vec3f> const & adjust_values) {
             for (int x = min_x; x < max_x; ++x) {
 
                 math::Vec3f bcoords = tri.get_barycentric_coords(x, y);
-                bool inside = bcoords.minimum() >= 0.0f;
+                // The point (x, y) is inside the triangle if all of its
+                // barycentric coordinates are positive.
+                // Further, we need to check that (x, y) does not touch the
+                // upper `texture_patch_border` (width-1 and height-1).
+                // This isn't necessary for the lower boarders.
+                // Example:
+                // Consider the triangle { (0,0), (0,1), (1,0) }
+                // in a 1x1 pixel image. With 1-pixels borders added around it
+                // it becomes the triangle { (1,1), (1,2), (2,1) }
+                // in a 3x3 pixel image.
+                // The lower borders (rows x=0 and y=0) will be free as expected
+                // because no point has these coordinates.
+                // But the upper border x=2 is "just touched" by point (2,1),
+                // so it would be marked as occupied (and texture borders are
+                // intended to be not occupied).
+                // Thus we must exclude them explicitly in the `inside`
+                // condition.
+                // OGCAC: the baricentric coordinates are prone to rounding errors
+                //  --> check 0 as well.
+                bool inside = bcoords.minimum() >= 0.0f
+                    && x != get_width() - 1 && y != get_height() - 1;
+                    && x != 0 && y != 0;
                 if (inside) {
                     assert(x != 0 && y != 0);
                     for (int c = 0; c < 3; ++c) {

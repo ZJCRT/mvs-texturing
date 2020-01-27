@@ -54,9 +54,10 @@ Tri::get_aabb(void) const {
 inline math::Vec3f
 Tri::get_barycentric_coords(float x, float y) const {
     float const alpha = ((v2[1] - v3[1]) * (x - v3[0]) + (v3[0] - v2[0]) * (y - v3[1])) / detT;
-    float const beta = ((v3[1] - v1[1]) * (x - v3[0]) + (v1[0] - v3[0]) * (y - v3[1])) / detT;
-    float const gamma = 1.0f - alpha - beta;
-    return math::Vec3f(alpha, beta, gamma);
+    float const beta = ((v3[1] - v1[1]) * (x - v1[0]) + (v1[0] - v3[0]) * (y - v1[1])) / detT;
+    float const gamma = ((v1[1] - v2[1]) * (x - v2[0]) + (v2[0] - v1[0]) * (y - v2[1])) / detT;
+    float const adjustment =  (1.0f - alpha - beta - gamma) / 3.0f;
+    return math::Vec3f(alpha + adjustment, beta + adjustment, gamma + adjustment);
 }
 
 inline bool
