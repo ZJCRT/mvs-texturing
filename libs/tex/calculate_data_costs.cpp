@@ -288,8 +288,6 @@ calculate_face_projection_infos(mve::TriangleMesh::ConstPtr mesh,
 void
 calculate_face_segmentation(FaceProjectionInfos const &face_projection_infos, Segmentation * segmentation)
 {
-    static const std::uint16_t NO_SEGMENT = 0;
-
     ProgressCounter face_counter("\tCalculate faces segmentation",
         face_projection_infos.size());
 
@@ -302,16 +300,18 @@ calculate_face_segmentation(FaceProjectionInfos const &face_projection_infos, Se
 
         std::vector<FaceProjectionInfo> const & infos = face_projection_infos.at(i);
 
-        if (infos.size() == 0)
-        {
-            (*segmentation)[i] = NO_SEGMENT;
-            continue;
-        }
-
         std::map<std::uint16_t, std::uint16_t> histogram;
         for(auto info : infos) {
-             ++histogram[info.segment_id];
+            if (info.segment_id != Segmentation::UNCLASSIFIED) {
+                ++histogram[info.segment_id];
+            }
         };
+
+        if (histogram.size() == 0)
+        {
+            (*segmentation)[i] = Segmentation::DEFAULT_SEGMENT_ID;
+            continue;
+        }
 
         auto maxi = std::max_element(
                     histogram.begin(),

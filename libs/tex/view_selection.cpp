@@ -41,7 +41,7 @@ view_selection(DataCosts const & data_costs, UniGraph * graph, Segmentation cons
     const size_t num_segments = segmentation.get_num_segments();
 
     // assuming that segment zero means: no segment and that all other segments_ids are between 1 and num_segments
-    const size_t NO_SEGMENT = 0;
+    // also: there should better be no Segmentation::UNCLASSIFIED segment left!
 
     // to node ids
     size_t node_id_counter = num_segments - 1; // reserve first nodes for segment placeholders
@@ -51,7 +51,7 @@ view_selection(DataCosts const & data_costs, UniGraph * graph, Segmentation cons
         auto segment_id = segmentation[i];
         assert(segment_id < num_segments);
 
-        if (segment_id != NO_SEGMENT) {
+        if (segment_id != Segmentation::DEFAULT_SEGMENT_ID) {
             node_ids[i] = segment_id - 1; // uses the fact that segment zero means "no segment"!
         }
         else {
@@ -150,7 +150,7 @@ view_selection(DataCosts const & data_costs, UniGraph * graph, Segmentation cons
     }
 
     // set possible labels for unsegmented faces
-    for (auto face_id : faces_of_segments[NO_SEGMENT]) {
+    for (auto face_id : faces_of_segments[Segmentation::DEFAULT_SEGMENT_ID]) {
         DataCosts::Column const & data_costs_for_node = data_costs.col(face_id);
 
         std::vector<mapmap::_iv_st<cost_t, simd_w> > labels;
@@ -190,7 +190,7 @@ view_selection(DataCosts const & data_costs, UniGraph * graph, Segmentation cons
     }
 
     // set weights for unsegmented faces
-    for (auto face_id : faces_of_segments[NO_SEGMENT]) {
+    for (auto face_id : faces_of_segments[Segmentation::DEFAULT_SEGMENT_ID]) {
         DataCosts::Column const & data_costs_for_node = data_costs.col(face_id);
 
         std::vector<mapmap::_s_t<cost_t, simd_w> > costs;

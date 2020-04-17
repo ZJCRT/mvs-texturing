@@ -45,6 +45,15 @@ class Segmentation
     std::uint16_t num_segments;
 
 public:
+
+    /// Faces with DEFAULT_SEGMENT_ID do not neccesarily be clustered to the same view
+    static const std::uint16_t DEFAULT_SEGMENT_ID = 0; 
+
+    /// If a view does not have a segmentation, its face-view-relation is unclassified.
+    /// Attention: The value UNCLASSIFIED should normally NOT be used in this class. 
+    /// it is intended for 2d-segmentation-usage only.
+    static const std::uint16_t UNCLASSIFIED = std::numeric_limits<std::uint16_t>::max();
+
     Segmentation()
      : num_segments(0)
     {}

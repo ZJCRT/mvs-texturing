@@ -212,11 +212,11 @@ from_nvm_cameras(mve::Bundle::Cameras & cameras, const std::vector<mve::NVMCamer
                     util::fs::replace_extension(util::fs::basename(nvm_cam.filename), "png");
             const std::string filename_segmentation = util::fs::join_path(segmentation_image_dir, base_seg_image_name);
 
-            mve::ByteImage::Ptr image_segmentation = mve::image::load_file(filename_segmentation);
-
-            image_segmentation_file = util::fs::replace_extension(image_file,"seg.png");
-
-            mve::image::save_png_file(image_segmentation, image_segmentation_file);
+            if (util::fs::exists(filename_segmentation.c_str())) {
+                mve::ByteImage::Ptr image_segmentation = mve::image::load_file(filename_segmentation);
+                image_segmentation_file = util::fs::replace_extension(image_file,"seg.png");
+                mve::image::save_png_file(image_segmentation, image_segmentation_file);
+            }
         }
 
         #pragma omp critical
