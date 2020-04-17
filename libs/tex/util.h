@@ -27,6 +27,7 @@
 #include "math/functions.h"
 
 #include "texturing.h"
+#include "json.hpp"
 
 /**
  * Converts an MVE matrix into an Eigen matrix.
@@ -161,15 +162,49 @@ get_jet_color(float value) {
 }
 
 inline void
-read_views_per_segment_file(std::string const & filename, tex::TextureViews const & texture_views, tex::ViewsPerSegment * views_per_segment)
+read_views_per_segment_json(std::string const & filename, std::map<std::string, std::uint16_t> const & image_name_to_view_id, tex::ViewsPerSegment * views_per_segment)
 {
-    // generate image_name->view_id mapping
-    std::map<std::string, std::uint16_t> view_id_of_image;
-    for (size_t i = 0; i < texture_views.size(); ++i)
+    nlohmann::json json_data;
     {
-        view_id_of_image[texture_views.at(i).get_image_id()] = i;
+        // read a JSON file
+        std::ifstream in(filename);
+        if (!in.good())
+            throw util::FileException(filename, std::strerror(errno));
+        in >> json_data;
     }
 
+    for (const auto &element : json_data.items()) {
+        std::uint16_t segment_id = std::stoi(element.key());
+
+        if (views_per_segment->find(segment_id) != views_per_segment->end()) {
+            std::stringstream strstr;
+            strstr << "while reading '" << filename << "': duplicated segment " << segment_id;
+            throw util::Exception(strstr.str());
+        }
+
+        std::vector<std::uint16_t> views;
+        for (const auto &image_name_json : element.value().items()) {
+            std::string image_name = image_name_json.value().get<std::string>();
+            auto view_it = image_name_to_view_id.find(image_name);
+            if (view_it != image_name_to_view_id.end()) views.push_back(view_it->second);
+            else {
+                std::stringstream strstr;
+                strstr << "while reading '" << filename << "': Image '" << image_name << "' of segment " << segment_id
+                       << " not referenced in scene definition.";
+                std::cerr << "WARNING: " + strstr.str() + "\n";
+            }
+        }
+
+        views_per_segment->emplace(segment_id, std::move(views));
+    }
+}
+
+inline void
+read_views_per_segment_txt(
+        std::string const & filename,
+        std::map<std::string, std::uint16_t> const & image_name_to_view_id,
+        tex::ViewsPerSegment * views_per_segment)
+{
     std::ifstream in(filename);
     if (!in.good())
         throw util::FileException(filename, std::strerror(errno));
@@ -178,8 +213,14 @@ read_views_per_segment_file(std::string const & filename, tex::TextureViews cons
     in >> num_segments;
 
     for (int i = 0; i < num_segments; ++i) {
-        std::uint16_t segment;
-        in >> segment;
+        std::uint16_t segment_id;
+        in >> segment_id;
+
+        if (views_per_segment->find(segment_id) != views_per_segment->end()) {
+            std::stringstream strstr;
+            strstr << "while reading '" << filename << "': duplicated segment " << segment_id;
+            throw util::Exception(strstr.str());
+        }
 
         int num_views;
         in >> num_views;
@@ -187,29 +228,43 @@ read_views_per_segment_file(std::string const & filename, tex::TextureViews cons
         std::vector<std::uint16_t> views;
         for(int j = 0; j < num_views; ++j)
         {
-            std::string image_id;
-            in >> image_id;
-            auto view_it = view_id_of_image.find(image_id);
-            if (view_it != view_id_of_image.end()) views.push_back(view_it->second);
+            std::string image_name;
+            in >> image_name;
+            auto view_it = image_name_to_view_id.find(image_name);
+            if (view_it != image_name_to_view_id.end()) views.push_back(view_it->second);
             else {
                 std::stringstream strstr;
-                strstr << "while reading '" << filename << "': Image '" << image_id << "' of segment " << segment
+                strstr << "while reading '" << filename << "': Image '" << image_name << "' of segment " << segment_id
                        << " not referenced in scene definition.";
                 std::cerr << "WARNING: " + strstr.str() + "\n";
             }
         }
 
-        tex::ViewsPerSegment::iterator found_it;
-        if ((found_it = views_per_segment->find(segment)) != views_per_segment->end()) {
-            std::stringstream strstr;
-            strstr << "while reading '" << filename << "': Segment " << segment << "already mentioned in " << filename
-                   << " (with " << found_it->second.size() << "views).";
-            throw util::Exception(strstr.str());
-        }
-        views_per_segment->emplace(segment, std::move(views));
+        views_per_segment->emplace(segment_id, std::move(views));
     }
 }
 
+inline void
+read_views_per_segment_file(std::string const & filename, tex::TextureViews const & texture_views, tex::ViewsPerSegment * views_per_segment)
+{
+    // generate image_name->view_id mapping
+    std::map<std::string, std::uint16_t> image_name_to_view_id;
+    for (size_t i = 0; i < texture_views.size(); ++i)
+    {
+        image_name_to_view_id[texture_views.at(i).get_image_id()] = i;
+    }
+
+    if (util::string::uppercase(util::string::right(filename, 5)) == ".JSON")
+    {
+        read_views_per_segment_json(filename, image_name_to_view_id, views_per_segment);
+    }
+    else
+    {
+        read_views_per_segment_txt(filename, image_name_to_view_id, views_per_segment);
+
+    }
+
+}
 
 
 #endif /* TEX_UTIL_HEADER */
