@@ -22,7 +22,7 @@
 #include "texture_atlas.h"
 
 #define MAX_TEXTURE_SIZE (8 * 1024)
-#define PREF_TEXTURE_SIZE (4 * 1024)
+#define PREF_TEXTURE_SIZE (2 * 1024)
 #define MIN_TEXTURE_SIZE (256)
 
 TEX_NAMESPACE_BEGIN
@@ -40,7 +40,7 @@ calculate_texture_size(std::list<TexturePatch::ConstPtr> const & texture_patches
         unsigned int total_area = 0;
         unsigned int max_width = 0;
         unsigned int max_height = 0;
-        unsigned int padding = size >> 7;
+        unsigned int padding = std::max(8U, size >> 8U); // at least 8 because of jpg grid
 
         for (TexturePatch::ConstPtr texture_patch : texture_patches) {
             unsigned int width = texture_patch->get_width() + 2 * padding;
