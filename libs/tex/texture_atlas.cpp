@@ -17,7 +17,7 @@
 #include "texture_atlas.h"
 
 TextureAtlas::TextureAtlas(unsigned int size) :
-    size(size), padding(std::max(8U, size >> 8U)), finalized(false) {
+    size(size), padding(size >> 7), finalized(false) {
 
     bin = RectangularBin::create(size, size);
     image = mve::ByteImage::create(size, size, 3);
