@@ -92,6 +92,7 @@ struct Settings {
     bool local_seam_leveling = true;
     bool hole_filling = true;
     bool keep_unseen_faces = false;
+    bool fill_all_holes = false;
 };
 
 TEX_NAMESPACE_END
