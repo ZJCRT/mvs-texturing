@@ -191,7 +191,10 @@ int main(int argc, char **argv) {
 
         /* Generate texture atlases. */
         std::cout << "Generating texture atlases:" << std::endl;
-        tex::generate_texture_atlases(&texture_patches, conf.settings, &texture_atlases);
+        if(conf.settings.single_texture_atlas)
+            tex::generate_single_atlas(&texture_patches, conf.settings, &texture_atlases);
+        else
+            tex::generate_texture_atlases(&texture_patches, conf.settings, &texture_atlases);
     }
 
     /* Create and write out obj model. */

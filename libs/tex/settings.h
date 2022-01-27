@@ -93,6 +93,7 @@ struct Settings {
     bool hole_filling = true;
     bool keep_unseen_faces = false;
     bool fill_all_holes = false;
+    bool single_texture_atlas = false;
 };
 
 TEX_NAMESPACE_END
