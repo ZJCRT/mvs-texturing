@@ -284,7 +284,7 @@ void pca_project_hole(std::vector<std::size_t> const & hole, UniGraph const & gr
 bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
     mve::TriangleMesh::ConstPtr mesh, mve::MeshInfo const & mesh_info,
     std::vector<std::vector<VertexProjectionInfo> > * vertex_projection_infos,
-    std::vector<TexturePatch::Ptr> * texture_patches) {
+    std::vector<TexturePatch::Ptr> * texture_patches, bool fill_all_holes) {
 
     mve::TriangleMesh::FaceList const & mesh_faces = mesh->get_faces();
     mve::TriangleMesh::VertexList const & vertices = mesh->get_vertices();
@@ -302,7 +302,7 @@ bool fill_hole(std::vector<std::size_t> const & hole, UniGraph const & graph,
 
     std::size_t const num_vertices = tmp.size();
     /* Only fill small holes. */
-    if (num_vertices > MAX_HOLE_NUM_FACES) return false;
+    if (!fill_all_holes && num_vertices > MAX_HOLE_NUM_FACES) return false;
 
     /* Calculate 2D parameterization using the technique from libremesh/patch2d,
      * which was published as source code accompanying the following paper:
@@ -680,7 +680,7 @@ generate_texture_patches(UniGraph const & graph, mve::TriangleMesh::ConstPtr mes
             bool success = false;
             if (settings.hole_filling) {
                 success = fill_hole(subgraph, graph, mesh, mesh_info,
-                    vertex_projection_infos, texture_patches);
+                    vertex_projection_infos, texture_patches, settings.fill_all_holes);
             }
 
             if (success) {

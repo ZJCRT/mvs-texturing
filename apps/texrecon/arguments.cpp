@@ -17,6 +17,8 @@
 #define WRITE_TIMINGS "write_timings"
 #define SKIP_HOLE_FILLING "skip_hole_filling"
 #define KEEP_UNSEEN_FACES "keep_unseen_faces"
+#define FILL_ALL_HOLES "fill_all_holes"
+#define SINGLE_TEXTURE_ATLAS "single_texture_atlas"
 
 Arguments parse_args(int argc, char **argv) {
     util::Arguments args;
@@ -86,6 +88,10 @@ Arguments parse_args(int argc, char **argv) {
         "Write out timings for each algorithm step (OUT_PREFIX + _timings.csv)");
     args.add_option('\0', NO_INTERMEDIATE_RESULTS, false,
         "Do not write out intermediate results");
+    args.add_option('\0', FILL_ALL_HOLES, false,
+        "Fill all holes (unseen faces) in the texture atlas");
+    args.add_option('\0', SINGLE_TEXTURE_ATLAS, false,
+        "Try to generate a single texture atlas by trying multiple, ascending resolutions.");
     args.add_option('S',"segmentation_image_dir", true,
         "directory to segmentation images. each file there must be named <image_name_wo_ext.png>");
     args.add_option('V',"views_per_segment_file", true,
@@ -146,6 +152,10 @@ Arguments parse_args(int argc, char **argv) {
                 conf.write_timings = true;
             } else if (i->opt->lopt == NO_INTERMEDIATE_RESULTS) {
                 conf.write_intermediate_results = false;
+            } else if (i->opt->lopt == FILL_ALL_HOLES) {
+                conf.settings.fill_all_holes = true;
+            } else if (i->opt->lopt == SINGLE_TEXTURE_ATLAS) {
+                conf.settings.single_texture_atlas = true;
             } else {
                 throw std::invalid_argument("Invalid long option");
             }

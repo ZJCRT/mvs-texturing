@@ -92,7 +92,7 @@ bool comp(TexturePatch::ConstPtr first, TexturePatch::ConstPtr second) {
 
 void
 generate_texture_atlases(std::vector<TexturePatch::Ptr> * orig_texture_patches,
-    Settings const & settings, std::vector<TextureAtlas::Ptr> * texture_atlases) {
+    Settings const & settings, std::vector<TextureAtlas::Ptr> * texture_atlases, unsigned int resolution) {
 
     std::list<TexturePatch::ConstPtr> texture_patches;
     while (!orig_texture_patches->empty()) {
@@ -115,6 +115,7 @@ generate_texture_atlases(std::vector<TexturePatch::Ptr> * orig_texture_patches,
     std::size_t const total_num_patches = texture_patches.size();
     std::size_t remaining_patches = texture_patches.size();
     std::ofstream tty("/dev/tty", std::ios_base::out);
+    bool resolution_too_small = false;
 
     #pragma omp parallel
     {
@@ -122,13 +123,16 @@ generate_texture_atlases(std::vector<TexturePatch::Ptr> * orig_texture_patches,
     {
 
     while (!texture_patches.empty()) {
-        unsigned int texture_size = calculate_texture_size(texture_patches);
+        unsigned int texture_size = resolution;
+        if(texture_size == 0)
+            texture_size = calculate_texture_size(texture_patches);
 
         texture_atlases->push_back(TextureAtlas::create(texture_size));
         TextureAtlas::Ptr texture_atlas = texture_atlases->back();
 
         /* Try to insert each of the texture patches into the texture atlas. */
         std::list<TexturePatch::ConstPtr>::iterator it = texture_patches.begin();
+        auto num_remaining = remaining_patches;
         for (; it != texture_patches.end();) {
             std::size_t done_patches = total_num_patches - remaining_patches;
             int precent = static_cast<float>(done_patches)
@@ -150,6 +154,14 @@ generate_texture_atlases(std::vector<TexturePatch::Ptr> * orig_texture_patches,
 
         #pragma omp task
         texture_atlas->finalize();
+
+        if(num_remaining == remaining_patches)
+        {
+            /*In this case, the last patch could not be fitted into the fixed, custom-size texture atlas.
+            Caution: Exception case, but throw is not allowed from within omp parallel section.*/
+            resolution_too_small = true;
+            break;
+        }
     }
 
     std::cout << "\r\tWorking on atlas " << texture_atlases->size()
@@ -163,6 +175,41 @@ generate_texture_atlases(std::vector<TexturePatch::Ptr> * orig_texture_patches,
     }
     /* End of parallel region. */
     }
+    
+    if(resolution_too_small)
+        throw std::runtime_error("Custom texture resolution too small");
 }
+
+void
+generate_single_atlas(std::vector<TexturePatch::Ptr> * orig_texture_patches,
+    Settings const & settings, std::vector<TextureAtlas::Ptr> * texture_atlases) {
+        const std::vector<unsigned int> resolutions = {1024, 2048, 4096};
+        for(const auto& resolution : resolutions)
+        {
+            /*Unfortunately, generate_texture_atlases also performs gamma correction on the input
+            data, so for issuing multiple calls, the data must be cloned.*/
+            std::vector<TexturePatch::Ptr> patches;
+            for(const auto& cur_patch : *orig_texture_patches)
+                patches.push_back(cur_patch->duplicate());
+
+            std::cout << "\tTrying to generate single atlas with resolution " << resolution << std::endl;
+            try
+            {
+                texture_atlases->clear();
+                generate_texture_atlases(&patches, settings, texture_atlases, resolution);
+
+                if(texture_atlases->size() != 1)
+                    throw std::runtime_error("Multiple atlases generated, trying higher resolution");
+                
+                return;
+            }
+            catch(const std::exception& e)
+            {
+                std::cout << "\t" << e.what() << std::endl;
+            }
+        }
+        
+        throw std::runtime_error("Insufficient resolution for single texture atlas");
+    }
 
 TEX_NAMESPACE_END
